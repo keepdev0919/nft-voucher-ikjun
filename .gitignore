@@ -1,0 +1,32 @@
+# 의존성 (npm install, gradle로 복원 가능)
+node_modules/
+.gradle/
+build/
+dist/
+.next/
+
+# 환경 변수 / 비밀키 (절대 올리면 안 됨)
+.env
+.env.local
+application-local.yml
+application-secret.yml
+
+# 빌드 결과물
+*.class
+*.jar
+*.war
+
+# Mac 시스템 파일
+.DS_Store
+
+# IDE 설정
+.idea/
+.vscode/
+*.iml
+
+# 로그
+*.log
+logs/
+
+# Truffle 빌드 결과 (배포할 때마다 달라짐)
+blockchain/build/

@@ -1,0 +1,47 @@
+server:
+  port: 8080
+
+spring:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    # Mysql Settings (ttocket DB - 기존)
+    url: jdbc:mysql://localhost:3306/ttocket?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+    username: root
+    password: ''
+
+  mvc:
+    pathmatch:
+      matching-strategy: ant_path_matcher
+  jpa:
+    database-platform: org.hibernate.dialect.MySQL5InnoDBDialect
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+          format_sql: true
+          default_batch_fetch_size: 1000
+  redis:
+    host: localhost
+    port: 6379
+    password: ''
+
+logging:
+  level:
+    com.ssafy.ttocket: DEBUG
+    com.ssafy.ttocket.voucher: DEBUG
+
+notification:
+  mattermost:
+    enabled: true
+    webhook-url: https://meeting.ssafy.com/hooks/5b4zrggtx3y6ugjoo9b9wwggje
+    pretext: Spring 에서 Error 발생
+    author-name: TTocket
+
+# NFT Voucher DB (nft_voucher 별도 DB)
+voucher:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    jdbc-url: jdbc:mysql://localhost:3306/nft_voucher?useSSL=false&serverTimezone=UTC&characterEncoding=UTF-8
+    username: root
+    password: ''

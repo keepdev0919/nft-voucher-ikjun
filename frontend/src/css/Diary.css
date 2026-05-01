@@ -1,0 +1,50 @@
+input:focus {
+    outline: none;
+}
+textarea:focus{
+    outline: none;
+}
+
+.DiaryColorPicker {
+	background: linear-gradient(-45deg, #ff0000, #f97b31, #f0e409, #26d523);
+	background-size: 400% 400%;
+	animation: gradient 5s ease infinite;
+}
+
+.UpBox {
+    position: absolute ;
+    top: -8px;
+    right: 90px;
+}
+
+@keyframes gradient {
+	0% {
+		background-position: 0% 50%;
+	}
+	50% {
+		background-position: 100% 50%;
+	}
+}
+
+.notes {
+	background-attachment: local;
+	background-image:
+	  linear-gradient(to right, rgba(255, 255, 255, 0) 10px, transparent 10px),
+	  linear-gradient(to left, rgba(255, 255, 255, 0) 10px, transparent 10px),
+	  repeating-linear-gradient(rgba(255, 255, 255, 0), rgba(255, 255, 255, 0) 31px, rgba(0,0,0,0.4) 31px, rgba(0,0,0,0.4) 32px);
+	line-height: 32px;
+	padding: 8px 5px;
+  }
+
+.notes2 {
+	background-attachment: local;
+	background-image:
+	  linear-gradient(to right, rgba(255, 255, 255, 0) 10px, transparent 10px),
+	  linear-gradient(to left, rgba(255, 255, 255, 0) 10px, transparent 10px),
+	  repeating-linear-gradient(rgba(255, 255, 255, 0), rgba(255, 255, 255, 0) 31px, rgba(0,0,0,0.4) 31px, rgba(0,0,0,0.4) 32px);
+	margin: 10px 10px;
+  }
+
+.InputUnder{
+	border-bottom-width: 1px;
+}

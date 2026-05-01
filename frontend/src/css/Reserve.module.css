@@ -1,0 +1,27 @@
+.sidebody > .slick-slide {
+  padding-left: 10px;
+  margin-bottom: -10px;
+}
+
+.sidebody > .slick-track {
+  padding-left: 10px;
+}
+
+.sidelistt {
+  padding-left: 10px;
+}
+
+.sidelistt > p {
+  font-size: 16px;
+}
+
+.bannerTriangle {
+  width: 0;
+  height: 0;
+  border-bottom: 96px solid rgb(46, 43, 43);
+  border-right: 200px solid transparent;
+  display: flex;
+  flex-direction: column;
+  padding-left: 2px;
+  opacity: 0.8;
+}

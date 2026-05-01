@@ -1,0 +1,31 @@
+@keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  
+.fade-in {
+    animation: fadeIn 1.0s ease-in-out;
+}
+
+.bottom-modal {
+    position: fixed;
+
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 0;
+    background-color: white;
+    overflow: hidden;
+    /* styles from step 2 */
+    transition: height 0.5s ease-out;
+  }
+  
+  .bottom-modal.open {
+    height: 55vh; /* set the modal's height when it's open */
+    padding: 10px;
+    transition: height 0.5s ease-out;  
+}
