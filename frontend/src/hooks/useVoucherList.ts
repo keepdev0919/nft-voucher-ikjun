@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback } from "react";
 import { getMyVouchers } from "../services/voucherApi";
 import { Voucher, VoucherStatus } from "../types/voucher";
+import { getMockVouchers } from "../services/mockVoucherStore";
 
 // API 응답 status (1/2/3) → 프론트 타입 변환
 const STATUS_MAP: Record<number, VoucherStatus> = {
@@ -74,13 +75,24 @@ export function useVoucherList() {
     setLoading(true);
     setError(null);
 
+    const mockData = getMockVouchers();
+
     try {
       const res = await getMyVouchers(walletAddress);
-      const data: Voucher[] = (res.data?.body ?? []).map(mapApiVoucher);
-      cacheRef.current.set(walletAddress, { data, timestamp: Date.now() });
-      setVouchers(data);
-    } catch (err: any) {
-      setError(err?.response?.data?.message ?? err?.message ?? "바우처 목록을 불러오지 못했습니다.");
+      const apiData: Voucher[] = (res.data?.body ?? []).map(mapApiVoucher);
+      // API 데이터와 mock 데이터 병합 (tokenId 기준 중복 제거)
+      const merged = [
+        ...apiData,
+        ...mockData.filter((m) => !apiData.some((d) => d.tokenId === m.tokenId)),
+      ];
+      cacheRef.current.set(walletAddress, { data: merged, timestamp: Date.now() });
+      setVouchers(merged);
+    } catch {
+      // API 실패 시 mock 데이터로 폴백
+      setVouchers(mockData);
+      if (mockData.length === 0) {
+        setError("바우처 목록을 불러오지 못했습니다.");
+      }
     } finally {
       setLoading(false);
     }

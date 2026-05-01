@@ -45,6 +45,8 @@ export default function MerchantHistory() {
       .finally(() => setLoading(false));
   }, [walletAddress]);
 
+  const totalPending = records.reduce((sum, r) => sum + r.usedAmount, 0);
+
   return (
     <div className="min-h-full">
       <div className="h-12" />
@@ -58,6 +60,26 @@ export default function MerchantHistory() {
           </span>
         )}
       </div>
+
+      {/* 정산 대기 금액 카드 */}
+      {!loading && records.length > 0 && (
+        <div className="px-6 mt-4">
+          <div
+            className="rounded-v-lg p-5 relative overflow-hidden"
+            style={{ background: "linear-gradient(135deg, #2563EB 0%, #1E40AF 100%)" }}
+          >
+            <div
+              className="absolute rounded-full pointer-events-none"
+              style={{ width: 140, height: 140, top: -30, right: -30, background: "rgba(255,255,255,0.08)" }}
+            />
+            <p className="text-xs text-white/70 font-medium">정산 대기 금액</p>
+            <p className="text-[26px] font-bold text-white mt-1 tracking-tight">
+              {totalPending.toLocaleString("ko-KR")}원
+            </p>
+            <p className="text-[11px] text-white/65 mt-1">총 {records.length}건</p>
+          </div>
+        </div>
+      )}
 
       {loading ? (
         <div className="flex justify-center mt-20">

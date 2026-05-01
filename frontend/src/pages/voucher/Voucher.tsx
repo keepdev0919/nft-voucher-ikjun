@@ -4,8 +4,7 @@ import VoucherBottomNav from "../../components/VoucherBottomNav";
 import VoucherHome from "./VoucherHome";
 import VoucherList from "./VoucherList";
 import VoucherDetail from "./VoucherDetail";
-import VoucherScan from "./VoucherScan";
-import VoucherBox from "./VoucherBox";
+import VoucherProgramList from "./VoucherProgramList";
 
 function Voucher() {
   return (
@@ -13,10 +12,9 @@ function Voucher() {
       <div className="h-full overflow-y-auto pb-16">
         <Routes>
           <Route path="/home" element={<VoucherHome />} />
+          <Route path="/programs" element={<VoucherProgramList />} />
           <Route path="/list" element={<VoucherList />} />
           <Route path="/list/:id" element={<VoucherDetail />} />
-          <Route path="/scan" element={<VoucherScan />} />
-          <Route path="/box" element={<VoucherBox />} />
           <Route path="*" element={<Navigate to="/voucher/home" replace />} />
         </Routes>
       </div>

@@ -6,7 +6,7 @@ export const GANACHE_NETWORK_ID = 5777;
 export const GANACHE_RPC_URL = "http://127.0.0.1:7545";
 export const GANACHE_CONTRACT_ADDRESS =
   process.env.REACT_APP_TICKET_CONTRACT_ADDRESS ??
-  "0x68177455696cc904547De74AFdC1ddb095D9C8ed";
+  "0x67f75e4454B0c84E18f24E26fF3aaB5b1a5dB034";
 
 const buildGanacheNetworkParams = (chainId: string) => ({
   chainId,

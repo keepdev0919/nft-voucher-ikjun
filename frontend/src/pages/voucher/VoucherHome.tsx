@@ -56,16 +56,16 @@ export default function VoucherHome() {
       {/* 빠른 액세스 */}
       <div className="px-6 mt-3 flex gap-3">
         <button
-          onClick={() => navigate("/voucher/scan")}
+          onClick={() => navigate("/voucher/programs")}
           className="flex-1 py-3.5 rounded-v-md bg-v-accentLight text-v-accent text-sm font-semibold active:bg-v-accent/20 transition-colors"
         >
-          QR 스캔
+          둘러보기
         </button>
         <button
           onClick={() => navigate("/voucher/list")}
           className="flex-1 py-3.5 rounded-v-md bg-v-accentLight text-v-accent text-sm font-semibold active:bg-v-accent/20 transition-colors"
         >
-          전체 보기
+          내 바우처
         </button>
       </div>
 

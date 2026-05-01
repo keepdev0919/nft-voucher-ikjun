@@ -1,27 +1,16 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import QRCode from "react-qr-code";
 import { useVoucherList } from "../../hooks/useVoucherList";
 import { useWallet } from "../../context/WalletContext";
-import { useVoucherContract } from "../../services/web3/useVoucherContract";
-import { logVoucherUseWithRetry } from "../../services/voucherApi";
 import { CATEGORY_ICON, CATEGORY_LABEL, STATUS_LABEL } from "../../types/voucher";
-import Toast from "../../components/Toast";
 
 export default function VoucherDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { walletAddress } = useWallet();
-  const { vouchers, loading, error, fetchVouchers, invalidateCache } = useVoucherList();
-  const { executeUseVoucher } = useVoucherContract();
-
-  const [amountInput, setAmountInput] = useState("");
-  const [txLoading, setTxLoading] = useState(false);
-  const [toast, setToast] = useState<{ msg: string; type: "error" | "success" | "info" } | null>(null);
-  const [showAmountForm, setShowAmountForm] = useState(false);
-
-  const showToast = (msg: string, type: "error" | "success" | "info" = "error") => {
-    setToast({ msg, type });
-  };
+  const { vouchers, loading, error, fetchVouchers } = useVoucherList();
+  const [showQR, setShowQR] = useState(false);
 
   useEffect(() => {
     if (walletAddress) fetchVouchers(walletAddress);
@@ -65,49 +54,8 @@ export default function VoucherDetail() {
     ? `${voucher.tokenAddress.slice(0, 8)}...${voucher.tokenAddress.slice(-4)}`
     : `Token #${voucher.tokenId}`;
 
-  const handleUse = async () => {
-    const amount = Number(amountInput);
-    if (!amount || amount <= 0) {
-      showToast("사용 금액을 올바르게 입력해주세요.");
-      return;
-    }
-    if (amount > voucher.remainingAmount) {
-      showToast(`잔액(${voucher.remainingAmount.toLocaleString("ko-KR")}원)을 초과할 수 없습니다.`);
-      return;
-    }
-    if (!walletAddress) {
-      showToast("지갑 주소를 확인할 수 없습니다.");
-      return;
-    }
-
-    setTxLoading(true);
-    try {
-      const txHash = await executeUseVoucher(voucher.tokenId, amount);
-
-      // 백엔드 재시도 로그
-      try {
-        await logVoucherUseWithRetry({
-          tokenId: voucher.tokenId,
-          merchantWallet: walletAddress,
-          usedAmount: amount,
-          txHash,
-        });
-      } catch {
-        showToast("결제 완료 (로그 저장 지연 중)", "info");
-      }
-
-      showToast(`${amount.toLocaleString("ko-KR")}원 사용 완료!`, "success");
-      invalidateCache(walletAddress);
-      setShowAmountForm(false);
-      setAmountInput("");
-      // 목록 갱신
-      setTimeout(() => fetchVouchers(walletAddress), 500);
-    } catch (err: any) {
-      showToast(err?.message ?? "바우처 사용 중 오류가 발생했습니다.");
-    } finally {
-      setTxLoading(false);
-    }
-  };
+  // 가맹점 QR 스캔에서 파싱할 데이터
+  const qrValue = JSON.stringify({ tokenId: voucher.tokenId });
 
   return (
     <div className="min-h-full">
@@ -154,44 +102,10 @@ export default function VoucherDetail() {
         </div>
       </div>
 
-      {/* QR 코드 섹션 (사용 가능한 경우만) */}
-      {isActive && (
-        <div className="mt-5 flex flex-col items-center">
-          <p className="text-xs text-v-textMuted mb-3">QR 코드로 결제하세요</p>
-          <div className="w-40 h-40 bg-v-surface rounded-v-md shadow-v-sm border border-v-border flex items-center justify-center p-3">
-            <svg viewBox="0 0 100 100" className="w-full h-full">
-              <rect x="5" y="5" width="30" height="30" fill="none" stroke="#0F172A" strokeWidth="4" />
-              <rect x="13" y="13" width="14" height="14" fill="#0F172A" />
-              <rect x="65" y="5" width="30" height="30" fill="none" stroke="#0F172A" strokeWidth="4" />
-              <rect x="73" y="13" width="14" height="14" fill="#0F172A" />
-              <rect x="5" y="65" width="30" height="30" fill="none" stroke="#0F172A" strokeWidth="4" />
-              <rect x="13" y="73" width="14" height="14" fill="#0F172A" />
-              <rect x="42" y="5" width="8" height="8" fill="#0F172A" />
-              <rect x="52" y="5" width="8" height="8" fill="#0F172A" />
-              <rect x="42" y="15" width="8" height="8" fill="#0F172A" />
-              <rect x="52" y="25" width="8" height="8" fill="#0F172A" />
-              <rect x="42" y="42" width="8" height="8" fill="#0F172A" />
-              <rect x="55" y="42" width="8" height="8" fill="#0F172A" />
-              <rect x="68" y="42" width="8" height="8" fill="#0F172A" />
-              <rect x="81" y="42" width="8" height="8" fill="#0F172A" />
-              <rect x="42" y="55" width="8" height="8" fill="#0F172A" />
-              <rect x="55" y="68" width="8" height="8" fill="#0F172A" />
-              <rect x="68" y="55" width="8" height="8" fill="#0F172A" />
-              <rect x="81" y="68" width="8" height="8" fill="#0F172A" />
-              <rect x="42" y="81" width="8" height="8" fill="#0F172A" />
-              <rect x="55" y="81" width="8" height="8" fill="#0F172A" />
-              <rect x="68" y="81" width="8" height="8" fill="#0F172A" />
-              <rect x="81" y="81" width="8" height="8" fill="#0F172A" />
-            </svg>
-          </div>
-          <p className="text-[11px] text-v-textMuted mt-2 font-mono">{shortAddress}</p>
-        </div>
-      )}
-
       {/* 바우처 정보 */}
       <div className="px-6 mt-5 space-y-2">
         {[
-          ["발급처", voucher.issuedBy],
+          ["발급처", voucher.issuedBy || "-"],
           ["유효기간", voucher.expiresAt],
           ["카테고리", `${CATEGORY_ICON[voucher.category]} ${CATEGORY_LABEL[voucher.category]}`],
           ...(voucher.allowedCategories.length > 0
@@ -211,56 +125,38 @@ export default function VoucherDetail() {
 
       {/* 사용하기 버튼 */}
       {isActive && (
-        <div className="px-6 mt-5 pb-6">
-          {!showAmountForm ? (
-            <button
-              onClick={() => setShowAmountForm(true)}
-              className="w-full py-4 rounded-v-lg bg-v-accent text-white font-semibold text-[15px] shadow-v-md active:bg-v-accentHover transition-colors"
-            >
-              사용하기
-            </button>
-          ) : (
-            <div className="space-y-3">
-              <label className="text-sm font-semibold text-v-text block">사용 금액</label>
-              <div className="relative">
-                <input
-                  type="number"
-                  value={amountInput}
-                  onChange={(e) => setAmountInput(e.target.value)}
-                  placeholder="금액 입력"
-                  min={1}
-                  max={voucher.remainingAmount}
-                  className="w-full px-4 py-3 pr-10 rounded-v-md border border-v-border bg-v-surface text-v-text text-sm outline-none focus:border-v-accent transition-colors"
-                />
-                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-v-textMuted">원</span>
-              </div>
-              <p className="text-xs text-v-textMuted">
-                최대 {voucher.remainingAmount.toLocaleString("ko-KR")}원
-              </p>
-              <div className="flex gap-3">
-                <button
-                  onClick={() => { setShowAmountForm(false); setAmountInput(""); }}
-                  className="flex-1 py-3.5 rounded-v-lg border border-v-border text-v-textMuted font-semibold text-sm transition-colors"
-                >
-                  취소
-                </button>
-                <button
-                  onClick={handleUse}
-                  disabled={txLoading}
-                  className="flex-1 py-3.5 rounded-v-lg bg-v-accent text-white font-semibold text-sm shadow-v-md active:bg-v-accentHover transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
-                >
-                  {txLoading ? (
-                    <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                  ) : "확인"}
-                </button>
-              </div>
-            </div>
-          )}
+        <div className="px-6 mt-5 pb-8">
+          <button
+            onClick={() => setShowQR(true)}
+            className="w-full py-4 rounded-v-lg bg-v-accent text-white font-semibold text-[15px] shadow-v-md active:bg-v-accentHover transition-colors"
+          >
+            사용하기
+          </button>
         </div>
       )}
 
-      {toast && (
-        <Toast message={toast.msg} type={toast.type} onClose={() => setToast(null)} />
+      {/* QR 전체화면 오버레이 */}
+      {showQR && (
+        <div className="fixed inset-0 bg-black/90 z-50 flex flex-col items-center justify-center px-8">
+          <p className="text-white/60 text-sm mb-2">{voucher.name}</p>
+          <p className="text-white text-[28px] font-bold mb-6">{formattedAmount}</p>
+
+          <div className="bg-white p-5 rounded-2xl shadow-2xl">
+            <QRCode value={qrValue} size={220} />
+          </div>
+
+          <p className="text-white/40 text-xs mt-5 font-mono">Token #{voucher.tokenId}</p>
+          <p className="text-white/50 text-sm mt-3 text-center">
+            가맹점에 이 QR 코드를 보여주세요
+          </p>
+
+          <button
+            onClick={() => setShowQR(false)}
+            className="mt-10 px-8 py-3 rounded-full bg-white/15 text-white text-sm font-medium"
+          >
+            닫기
+          </button>
+        </div>
       )}
     </div>
   );
