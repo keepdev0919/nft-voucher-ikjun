@@ -69,7 +69,10 @@ public class AuthService {
                     Arrays.copyOfRange(sigBytes, 32, 64)
             );
 
-            BigInteger publicKey = Sign.signedMessageToKey(
+            // personal_sign 표준 prefix("\x19Ethereum Signed Message:\n" + length)를 자동 적용해야
+            // 프론트의 eth_personal_sign 결과와 동일한 hash가 산출됨.
+            // 옛 코드는 prefix 없는 signedMessageToKey를 사용해서 매번 검증 실패.
+            BigInteger publicKey = Sign.signedPrefixedMessageToKey(
                     message.getBytes(StandardCharsets.UTF_8), sigData);
             return "0x" + Keys.getAddress(publicKey);
         } catch (Exception e) {

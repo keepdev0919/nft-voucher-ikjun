@@ -10,6 +10,16 @@ dist/
 .env.local
 application-local.yml
 application-secret.yml
+backend/src/main/resources/application.yml
+backend/src/main/resources/application-*.yml
+
+# dev.sh 스크립트 산출물 (Ganache 영구화 데이터 + PID/log)
+.ganache-db/
+.dev-pids/
+.dev-logs/
+
+# application.yml sed 백업 파일
+*.bak
 
 # 빌드 결과물
 *.class
