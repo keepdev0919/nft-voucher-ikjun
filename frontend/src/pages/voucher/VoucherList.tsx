@@ -14,13 +14,10 @@ export default function VoucherList() {
     if (walletAddress) fetchVouchers(walletAddress);
   }, [walletAddress, fetchVouchers]);
 
-  const featured = vouchers.find((v) => v.status === "active");
-  const activeCount = vouchers.filter((v) => v.status === "active").length;
-  const activeList = vouchers.filter(
-    (v) => v.status === "active" || v.status === "pending"
-  );
+  const featured = vouchers.find((v) => v.status === "ACTIVE");
+  const activeList = vouchers.filter((v) => v.status === "ACTIVE");
   const doneList = vouchers.filter(
-    (v) => v.status === "used" || v.status === "expired"
+    (v) => v.status === "USED_UP" || v.status === "BURNED"
   );
 
   return (
@@ -32,7 +29,7 @@ export default function VoucherList() {
         <h1 className="text-[20px] font-bold text-v-text">내 바우처</h1>
         {!loading && (
           <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-v-accentLight text-v-accent">
-            {activeCount}개 보유
+            {activeList.length}개 보유
           </span>
         )}
       </div>
@@ -57,7 +54,7 @@ export default function VoucherList() {
             <div className="px-6 mt-4">
               <VoucherFeaturedCard
                 voucher={featured}
-                onClick={() => navigate(`/voucher/list/${featured.tokenId}`)}
+                onClick={() => navigate(`/voucher/list/${featured.id}`)}
               />
             </div>
           )}
@@ -69,9 +66,9 @@ export default function VoucherList() {
               <div className="bg-v-surface rounded-v-lg px-4 shadow-v-sm">
                 {activeList.map((v) => (
                   <VoucherListItem
-                    key={v.tokenId}
+                    key={v.id}
                     voucher={v}
-                    onClick={() => navigate(`/voucher/list/${v.tokenId}`)}
+                    onClick={() => navigate(`/voucher/list/${v.id}`)}
                   />
                 ))}
               </div>
@@ -85,9 +82,9 @@ export default function VoucherList() {
               <div className="bg-v-surface rounded-v-lg px-4 shadow-v-sm">
                 {doneList.map((v) => (
                   <VoucherListItem
-                    key={v.tokenId}
+                    key={v.id}
                     voucher={v}
-                    onClick={() => navigate(`/voucher/list/${v.tokenId}`)}
+                    onClick={() => navigate(`/voucher/list/${v.id}`)}
                   />
                 ))}
               </div>
@@ -96,7 +93,9 @@ export default function VoucherList() {
 
           {vouchers.length === 0 && !error && (
             <div className="flex flex-col items-center justify-center mt-24 px-6 text-center">
-              <p className="text-v-textMuted text-sm">보유한 바우처가 없습니다</p>
+              <p className="text-v-textMuted text-sm">
+                보유한 바우처가 없습니다. 기관에서 발급을 기다려주세요.
+              </p>
             </div>
           )}
         </>

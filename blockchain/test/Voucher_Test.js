@@ -1,301 +1,651 @@
+const fs = require("fs");
+const os = require("os");
+const path = require("path");
+
 const Voucher = artifacts.require("Voucher");
+const {
+  canonicalItemSummary,
+  FileUsageDetailStore,
+  recordCommitmentHash,
+  recordCommitmentHashFromRaw,
+  usageHash,
+  UsageHashVerifier,
+} = require("./helpers/usageHashVerifier");
 
-contract("Voucher", function ([deployer, user1, user2, merchant1, merchant2]) {
-  let voucher;
-
-  // 공통 프로그램 파라미터
+contract("Voucher", function ([deployer, user, otherUser, merchant, unapprovedMerchant]) {
   const PROGRAM_ID = 1;
-  const PROGRAM_NAME = "급식 바우처";
-  const AMOUNT = web3.utils.toWei("0.1", "ether"); // 0.1 ETH 단위 금액
-  const CATEGORY = "식비";
+  const PROGRAM_NAME = "Meal Voucher";
+  const PROGRAM_AMOUNT = web3.utils.toBN(10000);
+  const PROGRAM_SUPPLY = 10;
+  const PROGRAM_CATEGORY = "food";
+  const TOKEN_URI = "ipfs://voucher/1";
+  const ZERO_BYTES32 = `0x${"0".repeat(64)}`;
+  const DEFAULT_EXPIRY_OFFSET_SECONDS = 3600;
 
-  // 만료 타임스탬프: 현재 + 30일
-  const EXPIRY_FUTURE = Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60;
-  // 만료된 타임스탬프: 현재 - 1일
-  const EXPIRY_PAST = Math.floor(Date.now() / 1000) - 24 * 60 * 60;
+  let voucher;
+  let chainId;
 
-  beforeEach(async () => {
+  before(async function () {
+    chainId = await web3.eth.getChainId();
+  });
+
+  beforeEach(async function () {
     voucher = await Voucher.new({ from: deployer });
   });
 
-  // ──────────────────────────────────────────────
-  //  1. createVoucherProgram
-  // ──────────────────────────────────────────────
-  describe("createVoucherProgram", function () {
-    it("프로그램을 생성하고 조회 시 올바른 값이 반환되어야 한다", async () => {
-      await voucher.createVoucherProgram(
-        PROGRAM_ID,
-        PROGRAM_NAME,
-        AMOUNT,
-        EXPIRY_FUTURE,
-        100,
-        CATEGORY,
-        { from: deployer }
-      );
-
-      const program = await voucher.programs(PROGRAM_ID);
-
-      assert.equal(program.programId.toString(), PROGRAM_ID.toString(), "programId 불일치");
-      assert.equal(program.name, PROGRAM_NAME, "name 불일치");
-      assert.equal(program.amount.toString(), AMOUNT.toString(), "amount 불일치");
-      assert.equal(program.expiryDate.toString(), EXPIRY_FUTURE.toString(), "expiryDate 불일치");
-      assert.equal(program.totalSupply.toString(), "100", "totalSupply 불일치");
-      assert.equal(program.category, CATEGORY, "category 불일치");
-      assert.equal(program.issuer, deployer, "issuer 불일치");
+  async function sendRpc(method, params) {
+    return new Promise((resolve, reject) => {
+      web3.currentProvider.send({ jsonrpc: "2.0", method, params, id: Date.now() }, (error, result) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+        if (result.error) {
+          reject(new Error(result.error.message));
+          return;
+        }
+        resolve(result.result);
+      });
     });
+  }
 
-    it("owner가 아닌 계정이 호출하면 revert되어야 한다", async () => {
+  async function latestTimestamp() {
+    const block = await web3.eth.getBlock("latest");
+    return Number(block.timestamp);
+  }
+
+  async function futureTimestamp(seconds = DEFAULT_EXPIRY_OFFSET_SECONDS) {
+    return (await latestTimestamp()) + seconds;
+  }
+
+  async function increaseTime(seconds) {
+    await sendRpc("evm_increaseTime", [seconds]);
+    await sendRpc("evm_mine", []);
+  }
+
+  async function expectRevert(promise, expectedReason) {
+    try {
+      await promise;
+    } catch (error) {
+      assert(error.message.includes(expectedReason), `expected "${expectedReason}" revert, got: ${error.message}`);
+      return;
+    }
+    assert.fail(`expected revert: ${expectedReason}`);
+  }
+
+  async function createProgram(
+    programId = PROGRAM_ID,
+    amount = PROGRAM_AMOUNT,
+    expiryOffset = DEFAULT_EXPIRY_OFFSET_SECONDS
+  ) {
+    const expiryDate = await futureTimestamp(expiryOffset);
+    await voucher.createVoucherProgram(
+      programId,
+      PROGRAM_NAME,
+      amount,
+      expiryDate,
+      PROGRAM_SUPPLY,
+      PROGRAM_CATEGORY,
+      { from: deployer }
+    );
+    return expiryDate;
+  }
+
+  async function mintVoucher(recipient = user, programId = PROGRAM_ID, uri = TOKEN_URI) {
+    const receipt = await voucher.mintVoucher(programId, recipient, uri, { from: deployer });
+    return receipt.logs.find((log) => log.event === "VoucherMinted").args.tokenId;
+  }
+
+  function voucherUsedLog(receipt) {
+    return receipt.logs.find((log) => log.event === "VoucherUsed").args;
+  }
+
+  function usageHashFromEvent(eventArgs) {
+    return usageHash(
+      web3,
+      {
+        recordCommitmentHash: eventArgs.recordCommitmentHash,
+        tokenId: eventArgs.tokenId,
+        user: eventArgs.user,
+        merchant: eventArgs.merchant,
+        amount: eventArgs.amount,
+        oldValue: eventArgs.oldValue,
+        newValue: eventArgs.newValue,
+        nonce: eventArgs.nonce,
+      },
+      chainId,
+      voucher.address
+    );
+  }
+
+  function usageDetail(overrides = {}) {
+    return {
+      recordId: "Voucher-Use:V1:Record-0001",
+      merchantBusinessId: "Seoul-Food-001",
+      terminalId: "",
+      receiptNo: "",
+      items: [{ sku: "MEAL-SET-A", name: "Meal Set A", qty: 1, amount: 3500 }],
+      issuedAtBucket: 1778630400,
+      ...overrides,
+    };
+  }
+
+  function localStore(records) {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), "bc-voucher-usage-store-"));
+    const store = new FileUsageDetailStore(path.join(directory, "usage-details.json"));
+    store.write(records);
+    return store;
+  }
+
+  async function signUseVoucher({
+    tokenId,
+    signer,
+    owner = user,
+    merchantWallet,
+    amount,
+    recordCommitment,
+    nonce,
+    deadline,
+  }) {
+    const typedData = {
+      types: {
+        EIP712Domain: [
+          { name: "name", type: "string" },
+          { name: "version", type: "string" },
+          { name: "chainId", type: "uint256" },
+          { name: "verifyingContract", type: "address" },
+        ],
+        UseVoucher: [
+          { name: "tokenId", type: "uint256" },
+          { name: "user", type: "address" },
+          { name: "merchant", type: "address" },
+          { name: "amount", type: "uint256" },
+          { name: "recordCommitmentHash", type: "bytes32" },
+          { name: "nonce", type: "uint256" },
+          { name: "deadline", type: "uint256" },
+        ],
+      },
+      primaryType: "UseVoucher",
+      domain: { name: "Voucher", version: "1", chainId, verifyingContract: voucher.address },
+      message: {
+        tokenId: tokenId.toString(),
+        user: owner,
+        merchant: merchantWallet,
+        amount: amount.toString(),
+        recordCommitmentHash: recordCommitment,
+        nonce: nonce.toString(),
+        deadline: deadline.toString(),
+      },
+    };
+
+    const methods = [
+      { name: "eth_signTypedData_v4", params: [signer, JSON.stringify(typedData)] },
+      { name: "eth_signTypedData_v3", params: [signer, JSON.stringify(typedData)] },
+      { name: "eth_signTypedData", params: [signer, typedData] },
+    ];
+    const errors = [];
+    for (const method of methods) {
       try {
-        await voucher.createVoucherProgram(
-          PROGRAM_ID,
-          PROGRAM_NAME,
-          AMOUNT,
-          EXPIRY_FUTURE,
-          100,
-          CATEGORY,
-          { from: user1 }
-        );
-        assert.fail("revert가 발생해야 함");
-      } catch (err) {
-        assert.ok(err.message.includes("revert"), "revert 메시지가 포함되어야 함");
+        return await sendRpc(method.name, method.params);
+      } catch (error) {
+        errors.push(`${method.name}: ${error.message}`);
       }
+    }
+    throw new Error(`EIP-712 signing failed: ${errors.join("; ")}`);
+  }
+
+  describe("canonical hash schema", function () {
+    it("recalculates frozen recordCommitmentHash and usageHash vectors with ABI encoding", async function () {
+      const fixedDetail = {
+        detailSchemaVersion: 1,
+        recordIdHash: "0xe1dedf2927e257fb1528e1bfc3072d3634e246a5cf689f57ddae74a18ace9d85",
+        merchantBusinessIdHash: "0x7610063a057ec52024d577f38ed67a365934c1cd7486992d1a2bd84610406caa",
+        terminalIdHash: "0x6d5b507dd4a592f37f7797b4054ea17252fdf7241eb9cfeff9ca9d99e16c2b79",
+        receiptNoHash: "0x3852f607f37f33c972c759295e3a42b2db4949885fd8ee37cbb41d74a04dea1e",
+        itemSummaryHash: "0x6ba09d5e6abfb862fc6869fc014c7a78025a3ca6608287f58e4f25c9c14ce505",
+        issuedAtBucket: "1778630400",
+      };
+      const recordCommitment = recordCommitmentHash(web3, fixedDetail);
+      assert.equal(recordCommitment, "0x30e5f83d19af406aaf67f55063c50784d33e8cd9b0a3649738dc8be1e3828037");
+
+      const fixedUsageHash = usageHash(
+        web3,
+        {
+          recordCommitmentHash: recordCommitment,
+          tokenId: 1,
+          user: "0x1111111111111111111111111111111111111111",
+          merchant: "0x2222222222222222222222222222222222222222",
+          amount: 3500,
+          oldValue: 10000,
+          newValue: 6500,
+          nonce: 0,
+        },
+        5777,
+        "0x3333333333333333333333333333333333333333"
+      );
+      assert.equal(fixedUsageHash, "0xe09d8107838119a10ab59e20c0db2c45ae023a2161b4f00c83f3a3a0dce1da86");
+
+      const rawVectorCommitment = recordCommitmentHashFromRaw(
+        web3,
+        usageDetail({
+          recordId: "  Voucher-Use:V1:Record-0001  ",
+          merchantBusinessId: " Seoul-Food-001 ",
+          terminalId: "",
+          receiptNo: "",
+          items: [{ sku: " MEAL-SET-A ", name: " Meal   Set A ", qty: 1, amount: 3500 }],
+        })
+      );
+      assert.equal(
+        canonicalItemSummary([{ sku: " MEAL-SET-A ", name: " Meal   Set A ", qty: 1, amount: 3500 }]),
+        "meal-set-a:meal set a:qty=1:amount=3500"
+      );
+      assert.equal(rawVectorCommitment, "0x3117bf2a01d89cb5de1faddc90f3d30bb8fb70301d91da1f0f674588e66514a8");
     });
   });
 
-  // ──────────────────────────────────────────────
-  //  2. mintVoucher
-  // ──────────────────────────────────────────────
-  describe("mintVoucher", function () {
-    beforeEach(async () => {
-      await voucher.createVoucherProgram(
+  describe("owner permissions", function () {
+    it("owner-only functions succeed for owner and revert for non-owner", async function () {
+      const expiryDate = await futureTimestamp();
+      const createReceipt = await voucher.createVoucherProgram(
         PROGRAM_ID,
         PROGRAM_NAME,
-        AMOUNT,
-        EXPIRY_FUTURE,
-        100,
-        CATEGORY,
+        PROGRAM_AMOUNT,
+        expiryDate,
+        PROGRAM_SUPPLY,
+        PROGRAM_CATEGORY,
         { from: deployer }
       );
+      assert.equal(createReceipt.logs[0].event, "VoucherProgramCreated");
+
+      await expectRevert(
+        voucher.createVoucherProgram(2, PROGRAM_NAME, PROGRAM_AMOUNT, expiryDate, PROGRAM_SUPPLY, PROGRAM_CATEGORY, {
+          from: user,
+        }),
+        "Ownable: caller is not the owner"
+      );
+
+      const approveReceipt = await voucher.approveMerchant(merchant, true, { from: deployer });
+      assert.equal(approveReceipt.logs[0].event, "MerchantApproved");
+      assert.equal(await voucher.approvedMerchant(merchant), true);
+
+      await expectRevert(
+        voucher.approveMerchant(unapprovedMerchant, true, { from: user }),
+        "Ownable: caller is not the owner"
+      );
+
+      const tokenId = await mintVoucher(user);
+      assert.equal((await voucher.ownerOf(tokenId)).toLowerCase(), user.toLowerCase());
+
+      await expectRevert(
+        voucher.mintVoucher(PROGRAM_ID, otherUser, TOKEN_URI, { from: user }),
+        "Ownable: caller is not the owner"
+      );
+    });
+  });
+
+  describe("mint and read model", function () {
+    it("stores owner, balance, voucher info, getTokenURI, tokenURI, and ABI entries", async function () {
+      const expiryDate = await createProgram();
+      const tokenId = await mintVoucher();
+
+      assert.equal((await voucher.ownerOf(tokenId)).toLowerCase(), user.toLowerCase());
+      assert.equal((await voucher.voucherValue(tokenId)).toString(), PROGRAM_AMOUNT.toString());
+      assert.equal(await voucher.getTokenURI(tokenId), TOKEN_URI);
+      assert.equal(await voucher.tokenURI(tokenId), TOKEN_URI);
+
+      const info = await voucher.getVoucherInfo(tokenId);
+      assert.equal(info.tokenId.toString(), tokenId.toString());
+      assert.equal(info.programId.toString(), PROGRAM_ID.toString());
+      assert.equal(info.programName, PROGRAM_NAME);
+      assert.equal(info.amount.toString(), PROGRAM_AMOUNT.toString());
+      assert.equal(info.expiryDate.toString(), expiryDate.toString());
+      assert.equal(info.status.toString(), "1");
+      assert.equal(info.owner.toLowerCase(), user.toLowerCase());
+
+      const program = await voucher.getVoucherProgram(PROGRAM_ID);
+      assert.equal(program.mintedSupply.toString(), "1");
+
+      const validity = await voucher.isValidVoucher(tokenId);
+      assert.equal(validity[0], true);
+
+      const abiNames = Voucher.abi.map((item) => item.name).filter(Boolean);
+      assert.includeMembers(abiNames, ["mintVoucher", "useVoucher", "useVoucherByMerchant", "VoucherUsed"]);
+      assert.equal(abiNames.some((name) => ["setvouchervalue", "updatevalue"].includes(name.toLowerCase())), false);
+
+      const useVoucherAbi = Voucher.abi.find((item) => item.name === "useVoucher");
+      const merchantUseAbi = Voucher.abi.find((item) => item.name === "useVoucherByMerchant");
+      const voucherUsedAbi = Voucher.abi.find((item) => item.name === "VoucherUsed");
+      assert.equal(useVoucherAbi.inputs.some((input) => input.name === "usageHash"), false);
+      assert.equal(merchantUseAbi.inputs.some((input) => input.name === "usageHash"), false);
+      assert.deepEqual(
+        voucherUsedAbi.inputs.map((input) => input.name),
+        ["tokenId", "user", "merchant", "amount", "oldValue", "newValue", "nonce", "recordCommitmentHash", "usageHash"]
+      );
+    });
+  });
+
+  describe("direct useVoucher", function () {
+    it("decreases balance, increments nonce, and emits contract-computed usageHash", async function () {
+      await createProgram();
+      await voucher.approveMerchant(merchant, true, { from: deployer });
+      const tokenId = await mintVoucher();
+      const amount = web3.utils.toBN(3500);
+      const oldValue = PROGRAM_AMOUNT;
+      const newValue = oldValue.sub(amount);
+      const nonce = await voucher.useNonce(tokenId);
+      const recordCommitment = recordCommitmentHashFromRaw(web3, usageDetail());
+
+      const receipt = await voucher.useVoucher(tokenId, merchant, amount, recordCommitment, { from: user });
+      const eventArgs = voucherUsedLog(receipt);
+      const expectedUsageHash = usageHashFromEvent(eventArgs);
+
+      assert.equal(eventArgs.tokenId.toString(), tokenId.toString());
+      assert.equal(eventArgs.user.toLowerCase(), user.toLowerCase());
+      assert.equal(eventArgs.merchant.toLowerCase(), merchant.toLowerCase());
+      assert.equal(eventArgs.amount.toString(), amount.toString());
+      assert.equal(eventArgs.oldValue.toString(), oldValue.toString());
+      assert.equal(eventArgs.newValue.toString(), newValue.toString());
+      assert.equal(eventArgs.nonce.toString(), nonce.toString());
+      assert.equal(eventArgs.recordCommitmentHash, recordCommitment);
+      assert.equal(eventArgs.usageHash, expectedUsageHash);
+      assert.equal((await voucher.voucherValue(tokenId)).toString(), newValue.toString());
+      assert.equal((await voucher.useNonce(tokenId)).toString(), "1");
     });
 
-    it("민팅 후 수신자가 NFT를 소유하고 status가 1(미사용)이어야 한다", async () => {
-      const tx = await voucher.mintVoucher(PROGRAM_ID, user1, { from: deployer });
+    it("reverts for non-owner, unapproved merchant, zero amount, zero record, insufficient balance, and expired voucher", async function () {
+      await createProgram();
+      await voucher.approveMerchant(merchant, true, { from: deployer });
+      const tokenId = await mintVoucher();
+      const recordCommitment = recordCommitmentHashFromRaw(web3, usageDetail({ recordId: "negative-direct" }));
 
-      // 반환된 tokenId 확인 (로그 또는 직접 조회)
-      const tokenId = 1; // 첫 번째 민팅 = tokenId 1
+      await expectRevert(
+        voucher.useVoucher(tokenId, merchant, 1, recordCommitment, { from: otherUser }),
+        "Voucher: caller is not owner"
+      );
+      assert.equal((await voucher.voucherValue(tokenId)).toString(), PROGRAM_AMOUNT.toString());
 
-      // ERC-721 소유권 확인
-      const nftOwner = await voucher.ownerOf(tokenId);
-      assert.equal(nftOwner, user1, "NFT 소유자가 user1이어야 함");
+      await expectRevert(
+        voucher.useVoucher(tokenId, unapprovedMerchant, 1, recordCommitment, { from: user }),
+        "Voucher: unapproved merchant"
+      );
+      await expectRevert(
+        voucher.useVoucher(tokenId, merchant, 0, recordCommitment, { from: user }),
+        "Voucher: amount is zero"
+      );
+      await expectRevert(
+        voucher.useVoucher(tokenId, merchant, 1, ZERO_BYTES32, { from: user }),
+        "Voucher: empty record commitment"
+      );
+      await expectRevert(
+        voucher.useVoucher(tokenId, merchant, PROGRAM_AMOUNT.add(web3.utils.toBN(1)), recordCommitment, { from: user }),
+        "Voucher: insufficient balance"
+      );
 
-      // VoucherInfo 확인
-      const info = await voucher.voucherInfos(tokenId);
-      assert.equal(info.tokenId.toString(), tokenId.toString(), "tokenId 불일치");
-      assert.equal(info.programId.toString(), PROGRAM_ID.toString(), "programId 불일치");
-      assert.equal(info.amount.toString(), AMOUNT.toString(), "amount 불일치");
-      assert.equal(info.status.toString(), "1", "status가 1(미사용)이어야 함");
-      assert.equal(info.owner, user1, "owner가 user1이어야 함");
+      await increaseTime(DEFAULT_EXPIRY_OFFSET_SECONDS + 400);
+      await expectRevert(
+        voucher.useVoucher(tokenId, merchant, 1, recordCommitment, { from: user }),
+        "Voucher: expired voucher"
+      );
 
-      // 이벤트 확인
-      const event = tx.logs.find((l) => l.event === "VoucherMinted");
-      assert.ok(event, "VoucherMinted 이벤트가 발생해야 함");
-      assert.equal(event.args.recipient, user1, "이벤트 recipient 불일치");
-      assert.equal(event.args.programId.toString(), PROGRAM_ID.toString(), "이벤트 programId 불일치");
+      const validity = await voucher.isValidVoucher(tokenId);
+      assert.equal(validity[0], false);
+      assert.equal(validity[1].status.toString(), "3");
     });
+  });
 
-    it("totalSupply 초과 민팅 시 revert되어야 한다", async () => {
-      // totalSupply=1짜리 프로그램 생성
-      await voucher.createVoucherProgram(2, "한정 바우처", AMOUNT, EXPIRY_FUTURE, 1, CATEGORY, {
-        from: deployer,
+  describe("merchant EIP-712 useVoucherByMerchant", function () {
+    it("succeeds with valid owner signature, emits usageHash, and rejects replay", async function () {
+      await createProgram();
+      await voucher.approveMerchant(merchant, true, { from: deployer });
+      const tokenId = await mintVoucher();
+      const amount = web3.utils.toBN(4000);
+      const oldValue = PROGRAM_AMOUNT;
+      const newValue = oldValue.sub(amount);
+      const nonce = await voucher.useNonce(tokenId);
+      const deadline = await futureTimestamp();
+      const recordCommitment = recordCommitmentHashFromRaw(web3, usageDetail({ recordId: "merchant-use-1" }));
+      const signature = await signUseVoucher({
+        tokenId,
+        signer: user,
+        merchantWallet: merchant,
+        amount,
+        recordCommitment,
+        nonce,
+        deadline,
       });
 
-      await voucher.mintVoucher(2, user1, { from: deployer }); // 1번째 — 성공
+      const receipt = await voucher.useVoucherByMerchant(tokenId, amount, recordCommitment, deadline, signature, {
+        from: merchant,
+      });
+      const eventArgs = voucherUsedLog(receipt);
 
-      try {
-        await voucher.mintVoucher(2, user2, { from: deployer }); // 2번째 — 실패
-        assert.fail("revert가 발생해야 함");
-      } catch (err) {
-        assert.ok(err.message.includes("revert"), "revert 메시지가 포함되어야 함");
-      }
+      assert.equal(eventArgs.recordCommitmentHash, recordCommitment);
+      assert.equal(eventArgs.usageHash, usageHashFromEvent(eventArgs));
+      assert.equal(eventArgs.user.toLowerCase(), user.toLowerCase());
+      assert.equal(eventArgs.merchant.toLowerCase(), merchant.toLowerCase());
+      assert.equal((await voucher.useNonce(tokenId)).toString(), "1");
+      assert.equal((await voucher.voucherValue(tokenId)).toString(), newValue.toString());
+
+      await expectRevert(
+        voucher.useVoucherByMerchant(tokenId, amount, recordCommitment, deadline, signature, { from: merchant }),
+        "Voucher: invalid signature"
+      );
+    });
+
+    it("reverts for wrong signer, unapproved merchant, expired deadline, zero record, and insufficient balance", async function () {
+      await createProgram();
+      await voucher.approveMerchant(merchant, true, { from: deployer });
+
+      const tokenId = await mintVoucher();
+      const amount = web3.utils.toBN(1000);
+      const nonce = await voucher.useNonce(tokenId);
+      const deadline = await futureTimestamp();
+      const recordCommitment = recordCommitmentHashFromRaw(web3, usageDetail({ recordId: "merchant-use-negative" }));
+      const wrongSignature = await signUseVoucher({
+        tokenId,
+        signer: otherUser,
+        owner: user,
+        merchantWallet: merchant,
+        amount,
+        recordCommitment,
+        nonce,
+        deadline,
+      });
+
+      await expectRevert(
+        voucher.useVoucherByMerchant(tokenId, amount, recordCommitment, deadline, wrongSignature, { from: merchant }),
+        "Voucher: invalid signature"
+      );
+
+      const unapprovedSignature = await signUseVoucher({
+        tokenId,
+        signer: user,
+        merchantWallet: unapprovedMerchant,
+        amount,
+        recordCommitment,
+        nonce,
+        deadline,
+      });
+      await expectRevert(
+        voucher.useVoucherByMerchant(tokenId, amount, recordCommitment, deadline, unapprovedSignature, {
+          from: unapprovedMerchant,
+        }),
+        "Voucher: unapproved merchant"
+      );
+
+      const expiredDeadline = (await latestTimestamp()) - 1;
+      const expiredSignature = await signUseVoucher({
+        tokenId,
+        signer: user,
+        merchantWallet: merchant,
+        amount,
+        recordCommitment,
+        nonce,
+        deadline: expiredDeadline,
+      });
+      await expectRevert(
+        voucher.useVoucherByMerchant(tokenId, amount, recordCommitment, expiredDeadline, expiredSignature, {
+          from: merchant,
+        }),
+        "Voucher: signature expired"
+      );
+
+      const zeroRecordSignature = await signUseVoucher({
+        tokenId,
+        signer: user,
+        merchantWallet: merchant,
+        amount,
+        recordCommitment: ZERO_BYTES32,
+        nonce,
+        deadline,
+      });
+      await expectRevert(
+        voucher.useVoucherByMerchant(tokenId, amount, ZERO_BYTES32, deadline, zeroRecordSignature, { from: merchant }),
+        "Voucher: empty record commitment"
+      );
+
+      const tooMuch = PROGRAM_AMOUNT.add(web3.utils.toBN(1));
+      const tooMuchSignature = await signUseVoucher({
+        tokenId,
+        signer: user,
+        merchantWallet: merchant,
+        amount: tooMuch,
+        recordCommitment,
+        nonce,
+        deadline,
+      });
+      await expectRevert(
+        voucher.useVoucherByMerchant(tokenId, tooMuch, recordCommitment, deadline, tooMuchSignature, { from: merchant }),
+        "Voucher: insufficient balance"
+      );
+    });
+
+    it("rejects tampered amount, merchant, record commitment, deadline, and nonce", async function () {
+      await createProgram();
+      await voucher.approveMerchant(merchant, true, { from: deployer });
+      await voucher.approveMerchant(unapprovedMerchant, true, { from: deployer });
+
+      const tokenId = await mintVoucher();
+      const amount = web3.utils.toBN(1000);
+      const nonce = await voucher.useNonce(tokenId);
+      const deadline = await futureTimestamp();
+      const recordCommitment = recordCommitmentHashFromRaw(web3, usageDetail({ recordId: "merchant-use-tamper" }));
+      const tamperedRecordCommitment = recordCommitmentHashFromRaw(
+        web3,
+        usageDetail({ recordId: "merchant-use-tampered-record" })
+      );
+      const signature = await signUseVoucher({
+        tokenId,
+        signer: user,
+        merchantWallet: merchant,
+        amount,
+        recordCommitment,
+        nonce,
+        deadline,
+      });
+      const wrongNonceSignature = await signUseVoucher({
+        tokenId,
+        signer: user,
+        merchantWallet: merchant,
+        amount,
+        recordCommitment,
+        nonce: web3.utils.toBN(1),
+        deadline,
+      });
+
+      await expectRevert(
+        voucher.useVoucherByMerchant(tokenId, amount.add(web3.utils.toBN(1)), recordCommitment, deadline, signature, {
+          from: merchant,
+        }),
+        "Voucher: invalid signature"
+      );
+      await expectRevert(
+        voucher.useVoucherByMerchant(tokenId, amount, recordCommitment, deadline, signature, {
+          from: unapprovedMerchant,
+        }),
+        "Voucher: invalid signature"
+      );
+      await expectRevert(
+        voucher.useVoucherByMerchant(tokenId, amount, tamperedRecordCommitment, deadline, signature, { from: merchant }),
+        "Voucher: invalid signature"
+      );
+      await expectRevert(
+        voucher.useVoucherByMerchant(tokenId, amount, recordCommitment, deadline + 1, signature, { from: merchant }),
+        "Voucher: invalid signature"
+      );
+      await expectRevert(
+        voucher.useVoucherByMerchant(tokenId, amount, recordCommitment, deadline, wrongNonceSignature, {
+          from: merchant,
+        }),
+        "Voucher: invalid signature"
+      );
     });
   });
 
-  // ──────────────────────────────────────────────
-  //  3. useVoucher
-  // ──────────────────────────────────────────────
-  describe("useVoucher", function () {
-    const TOKEN_ID = 1;
-    const USE_AMOUNT = web3.utils.toWei("0.04", "ether");
+  describe("local usage verifier integration", function () {
+    it("verifies matching Ganache VoucherUsed event against a file-backed usage detail store", async function () {
+      await createProgram();
+      await voucher.approveMerchant(merchant, true, { from: deployer });
+      const tokenId = await mintVoucher();
+      const detail = usageDetail({ recordId: "verifier-ok" });
+      const recordCommitment = recordCommitmentHashFromRaw(web3, detail);
 
-    beforeEach(async () => {
-      await voucher.createVoucherProgram(
-        PROGRAM_ID,
-        PROGRAM_NAME,
-        AMOUNT,
-        EXPIRY_FUTURE,
-        100,
-        CATEGORY,
-        { from: deployer }
+      await voucher.useVoucher(tokenId, merchant, 3500, recordCommitment, { from: user });
+
+      const verifier = new UsageHashVerifier({
+        web3,
+        chainId,
+        contractAddress: voucher.address,
+        store: localStore([{ recordCommitmentHash: recordCommitment, detail }]),
+      });
+      const events = await voucher.getPastEvents("VoucherUsed", { fromBlock: 0, toBlock: "latest" });
+      const verification = verifier.verify(events);
+
+      assert.deepEqual(
+        verification.results.map((result) => result.status),
+        ["VERIFIED"]
       );
-      await voucher.mintVoucher(PROGRAM_ID, user1, { from: deployer });
+      assert.deepEqual(verification.findings, []);
     });
 
-    it("부분 사용 후 amount가 감소하고 status는 1(미사용)을 유지해야 한다", async () => {
-      const tx = await voucher.useVoucher(TOKEN_ID, USE_AMOUNT, { from: user1 });
+    it("returns MISMATCH, MISSING_DB, MISSING_ONCHAIN, and duplicate commitment findings", async function () {
+      await createProgram(2);
+      await voucher.approveMerchant(merchant, true, { from: deployer });
+      const firstTokenId = await mintVoucher(user, 2, "ipfs://voucher/verifier/1");
+      const secondTokenId = await mintVoucher(user, 2, "ipfs://voucher/verifier/2");
+      const detail = usageDetail({ recordId: "verifier-duplicate" });
+      const duplicateCommitment = recordCommitmentHashFromRaw(web3, detail);
+      const missingDbCommitment = recordCommitmentHashFromRaw(web3, usageDetail({ recordId: "verifier-missing-db" }));
+      const orphanDetail = usageDetail({ recordId: "verifier-missing-onchain" });
+      const orphanCommitment = recordCommitmentHashFromRaw(web3, orphanDetail);
 
-      const info = await voucher.voucherInfos(TOKEN_ID);
-      const expectedRemaining = BigInt(AMOUNT) - BigInt(USE_AMOUNT);
+      await voucher.useVoucher(firstTokenId, merchant, 1000, duplicateCommitment, { from: user });
+      await voucher.useVoucher(secondTokenId, merchant, 1000, duplicateCommitment, { from: user });
+      await voucher.useVoucher(firstTokenId, merchant, 500, missingDbCommitment, { from: user });
 
-      assert.equal(
-        info.amount.toString(),
-        expectedRemaining.toString(),
-        "잔액이 usedAmount만큼 감소해야 함"
+      const verifier = new UsageHashVerifier({
+        web3,
+        chainId,
+        contractAddress: voucher.address,
+        store: localStore([
+          {
+            recordCommitmentHash: duplicateCommitment,
+            detail: usageDetail({ recordId: "verifier-duplicate-mutated" }),
+          },
+          { recordCommitmentHash: orphanCommitment, detail: orphanDetail },
+        ]),
+      });
+      const events = await voucher.getPastEvents("VoucherUsed", { fromBlock: 0, toBlock: "latest" });
+      const verification = verifier.verify(events);
+      const statuses = verification.results.map((result) => result.status);
+
+      assert.equal(statuses.filter((status) => status === "MISMATCH").length, 2);
+      assert.equal(statuses.includes("MISSING_DB"), true);
+      assert.equal(statuses.includes("MISSING_ONCHAIN"), true);
+      assert.deepEqual(
+        verification.findings.map((finding) => finding.finding),
+        ["DUPLICATE_COMMITMENT"]
       );
-      assert.equal(info.status.toString(), "1", "부분 사용 후 status는 아직 1이어야 함");
-
-      // 이벤트 확인
-      const event = tx.logs.find((l) => l.event === "VoucherUsed");
-      assert.ok(event, "VoucherUsed 이벤트가 발생해야 함");
-      assert.equal(event.args.usedAmount.toString(), USE_AMOUNT.toString(), "이벤트 usedAmount 불일치");
-    });
-
-    it("전액 사용 후 amount가 0이 되고 status가 2(사용완료)로 변경되어야 한다", async () => {
-      await voucher.useVoucher(TOKEN_ID, AMOUNT, { from: user1 });
-
-      const info = await voucher.voucherInfos(TOKEN_ID);
-      assert.equal(info.amount.toString(), "0", "전액 사용 후 amount가 0이어야 함");
-      assert.equal(info.status.toString(), "2", "전액 사용 후 status가 2(사용완료)여야 함");
-    });
-
-    it("소유자가 아닌 계정이 useVoucher 호출 시 revert되어야 한다", async () => {
-      try {
-        await voucher.useVoucher(TOKEN_ID, USE_AMOUNT, { from: user2 });
-        assert.fail("revert가 발생해야 함");
-      } catch (err) {
-        assert.ok(err.message.includes("revert"), "revert 메시지가 포함되어야 함");
-      }
-    });
-
-    it("이미 전액 사용된(status=2) 바우처를 다시 사용하려 하면 revert되어야 한다", async () => {
-      await voucher.useVoucher(TOKEN_ID, AMOUNT, { from: user1 });
-
-      try {
-        await voucher.useVoucher(TOKEN_ID, USE_AMOUNT, { from: user1 });
-        assert.fail("revert가 발생해야 함");
-      } catch (err) {
-        assert.ok(err.message.includes("revert"), "revert 메시지가 포함되어야 함");
-      }
-    });
-
-    it("잔액보다 많은 금액을 사용하려 하면 revert되어야 한다", async () => {
-      const overAmount = web3.utils.toWei("1", "ether"); // AMOUNT보다 큰 값
-      try {
-        await voucher.useVoucher(TOKEN_ID, overAmount, { from: user1 });
-        assert.fail("revert가 발생해야 함");
-      } catch (err) {
-        assert.ok(err.message.includes("revert"), "revert 메시지가 포함되어야 함");
-      }
-    });
-  });
-
-  // ──────────────────────────────────────────────
-  //  4. isValidVoucher
-  // ──────────────────────────────────────────────
-  describe("isValidVoucher", function () {
-    it("정상 미사용 바우처는 valid=true를 반환해야 한다", async () => {
-      await voucher.createVoucherProgram(
-        PROGRAM_ID, PROGRAM_NAME, AMOUNT, EXPIRY_FUTURE, 100, CATEGORY, { from: deployer }
-      );
-      await voucher.mintVoucher(PROGRAM_ID, user1, { from: deployer });
-
-      const [valid, info] = await voucher.isValidVoucher(1);
-      assert.equal(valid, true, "유효한 바우처는 valid=true여야 함");
-      assert.equal(info.status.toString(), "1", "status가 1이어야 함");
-    });
-
-    it("전액 사용완료(status=2) 바우처는 valid=false를 반환해야 한다", async () => {
-      await voucher.createVoucherProgram(
-        PROGRAM_ID, PROGRAM_NAME, AMOUNT, EXPIRY_FUTURE, 100, CATEGORY, { from: deployer }
-      );
-      await voucher.mintVoucher(PROGRAM_ID, user1, { from: deployer });
-      await voucher.useVoucher(1, AMOUNT, { from: user1 });
-
-      const [valid, info] = await voucher.isValidVoucher(1);
-      assert.equal(valid, false, "사용완료 바우처는 valid=false여야 함");
-      assert.equal(info.status.toString(), "2", "status가 2여야 함");
-    });
-
-    it("만료된 expiryDate를 가진 바우처는 valid=false를 반환해야 한다", async () => {
-      // 만료 프로그램 생성 (expiryDate = 과거 타임스탬프)
-      await voucher.createVoucherProgram(
-        2, "만료 바우처", AMOUNT, EXPIRY_PAST, 100, CATEGORY, { from: deployer }
-      );
-      await voucher.mintVoucher(2, user1, { from: deployer });
-
-      const [valid] = await voucher.isValidVoucher(2); // tokenId=2
-      assert.equal(valid, false, "만료된 바우처는 valid=false여야 함");
-    });
-
-    it("존재하지 않는 tokenId는 valid=false를 반환해야 한다", async () => {
-      const [valid] = await voucher.isValidVoucher(9999);
-      assert.equal(valid, false, "존재하지 않는 tokenId는 valid=false여야 함");
-    });
-  });
-
-  // ──────────────────────────────────────────────
-  //  5. Soulbound: transfer 차단
-  // ──────────────────────────────────────────────
-  describe("Soulbound transfer 차단", function () {
-    beforeEach(async () => {
-      await voucher.createVoucherProgram(
-        PROGRAM_ID, PROGRAM_NAME, AMOUNT, EXPIRY_FUTURE, 100, CATEGORY, { from: deployer }
-      );
-      await voucher.mintVoucher(PROGRAM_ID, user1, { from: deployer });
-    });
-
-    it("transferFrom 호출 시 revert되어야 한다", async () => {
-      try {
-        await voucher.transferFrom(user1, user2, 1, { from: user1 });
-        assert.fail("revert가 발생해야 함");
-      } catch (err) {
-        assert.ok(
-          err.message.includes("non-transferable"),
-          "non-transferable 메시지가 포함되어야 함"
-        );
-      }
-    });
-  });
-
-  // ──────────────────────────────────────────────
-  //  6. registerMerchant / isMerchant / approveMerchant
-  // ──────────────────────────────────────────────
-  describe("가맹점 등록 및 승인", function () {
-    it("가맹점 등록 후 isMerchant는 false(미승인 상태)여야 한다", async () => {
-      await voucher.registerMerchant("테스트 식당", "식비", { from: merchant1 });
-
-      const approved = await voucher.isMerchant(merchant1);
-      assert.equal(approved, false, "등록 직후 미승인 상태여야 함");
-
-      const info = await voucher.merchants(merchant1);
-      assert.equal(info.name, "테스트 식당", "가맹점 이름 불일치");
-    });
-
-    it("approveMerchant 후 isMerchant가 true여야 한다", async () => {
-      await voucher.registerMerchant("테스트 식당", "식비", { from: merchant1 });
-      await voucher.approveMerchant(merchant1, { from: deployer });
-
-      const approved = await voucher.isMerchant(merchant1);
-      assert.equal(approved, true, "승인 후 isMerchant=true여야 함");
-    });
-
-    it("동일 주소로 중복 등록 시 revert되어야 한다", async () => {
-      await voucher.registerMerchant("테스트 식당", "식비", { from: merchant1 });
-      try {
-        await voucher.registerMerchant("다른 이름", "교통", { from: merchant1 });
-        assert.fail("revert가 발생해야 함");
-      } catch (err) {
-        assert.ok(err.message.includes("revert"), "revert 메시지가 포함되어야 함");
-      }
     });
   });
 });

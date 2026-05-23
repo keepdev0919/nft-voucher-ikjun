@@ -1,5 +1,5 @@
 const Voucher = artifacts.require("Voucher");
 
-module.exports = function(deployer) {
-  deployer.deploy(Voucher);
+module.exports = async function (deployer) {
+  await deployer.deploy(Voucher);
 };

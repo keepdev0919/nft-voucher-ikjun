@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import MetaMaskLogo from '../../assets/metamaskLogo.png'
 import LoginImg1 from '../../assets/loginImg1.png'
 import LoginImg2 from '../../assets/loginImg2.png'
@@ -6,12 +6,13 @@ import LoginImg3 from '../../assets/loginImg3.png'
 import LoginImg4 from '../../assets/loginImg4.png'
 import LogoWhite from '../../assets/mainLogo.png'
 import Slider from 'react-slick'
-import "../../../node_modules/slick-carousel/slick/slick.css"; 
-import "../../../node_modules/slick-carousel/slick/slick-theme.css"; 
+import "../../../node_modules/slick-carousel/slick/slick.css";
+import "../../../node_modules/slick-carousel/slick/slick-theme.css";
 import { useNavigate } from 'react-router'
 import { Injected } from '../../services/web3/Injected'
 import {useWeb3React} from '@web3-react/core'
 import { ensureGanacheNetwork, GANACHE_RPC_URL } from '../../services/web3/network'
+import { useWallet } from '../../context/WalletContext'
 
 // function isMobileDevice() {
 //   return 'ontouchstart' in window || 'onmsgesturechange' in window;
@@ -27,6 +28,23 @@ function LoginMain() {
   };
   const {activate} = useWeb3React();
   const navigator = useNavigate();
+  const { isAuthenticated, role } = useWallet();
+
+  // 이미 로그인된 사용자가 이 페이지에 들어오면 역할별 홈으로 보낸다.
+  // role이 비어있으면 기본적으로 사용자 홈으로 — 안전한 기본값.
+  useEffect(() => {
+    if (isAuthenticated) {
+      if (role === 'merchant') navigator('/merchant/home', { replace: true });
+      else if (role === 'admin') navigator('/admin/home', { replace: true });
+      else navigator('/voucher/home', { replace: true });
+    } else {
+      // 미로그인 — 신규 로그인 페이지로 보낸다 (App.tsx 라우터 기준 /login).
+      // 다만 이 LoginMain 자체가 현재 라우팅에 연결돼 있지 않다면 effect는 무해.
+      navigator('/login', { replace: true });
+    }
+    // 마운트 시 1회
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleConnect = async () => {
     if ((window as any).ethereum === undefined) {

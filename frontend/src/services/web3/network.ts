@@ -4,9 +4,20 @@ export const GANACHE_ALT_CHAIN_ID = 5777;
 export const GANACHE_ALT_CHAIN_ID_HEX = "0x1691";
 export const GANACHE_NETWORK_ID = 5777;
 export const GANACHE_RPC_URL = "http://127.0.0.1:7545";
+const FALLBACK_CONTRACT_ADDRESS =
+  "0x0000000000000000000000000000000000000000";
+
+if (!process.env.REACT_APP_CONTRACT_ADDRESS) {
+  // eslint-disable-next-line no-console
+  console.warn(
+    "[web3] REACT_APP_CONTRACT_ADDRESS 환경변수가 없습니다. " +
+      "기본값(0x000…) 사용 중 — 컨트랙트 호출이 실패합니다. " +
+      ".env에 REACT_APP_CONTRACT_ADDRESS=<배포된 Voucher 주소>를 설정하세요."
+  );
+}
+
 export const GANACHE_CONTRACT_ADDRESS =
-  process.env.REACT_APP_TICKET_CONTRACT_ADDRESS ??
-  "0x67f75e4454B0c84E18f24E26fF3aaB5b1a5dB034";
+  process.env.REACT_APP_CONTRACT_ADDRESS ?? FALLBACK_CONTRACT_ADDRESS;
 
 const buildGanacheNetworkParams = (chainId: string) => ({
   chainId,

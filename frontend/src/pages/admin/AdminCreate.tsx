@@ -1,24 +1,31 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useVoucherContract } from "../../services/web3/useVoucherContract";
-import { createProgram } from "../../services/voucherApi";
+import { createVoucherProgram } from "../../services/voucherApi";
 import { useWallet } from "../../context/WalletContext";
 import Toast from "../../components/Toast";
 
-const CATEGORIES = ["식비", "교통", "도서", "의료", "기타"];
+const CATEGORIES = ["일반 음식점", "영화관", "카페", "편의점"];
+
+// datetime-local 값(YYYY-MM-DDTHH:mm)을 백엔드 LocalDateTime 호환 문자열로 변환.
+// LocalDateTime은 타임존 없는 ISO이므로 초 단위까지 채워서 전달한다.
+function toLocalDateTime(value: string): string {
+  if (!value) return "";
+  // datetime-local 입력은 "2026-05-22T14:30" 형태. 초가 없으면 ":00"을 붙인다.
+  return value.length === 16 ? `${value}:00` : value;
+}
 
 export default function AdminCreate() {
   const navigate = useNavigate();
   const { walletAddress } = useWallet();
-  const { createVoucherProgram } = useVoucherContract();
 
   const [form, setForm] = useState({
-    programId: "",
     name: "",
-    amount: "",
-    expiryDate: "",
+    description: "",
+    maxValue: "",
     totalSupply: "",
-    category: "식비",
+    category: "일반 음식점",
+    validFrom: "",
+    validUntil: "",
   });
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState<{ msg: string; type: "error" | "success" | "info" } | null>(null);
@@ -28,14 +35,14 @@ export default function AdminCreate() {
   };
 
   const handleChange = (field: keyof typeof form) => (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
   ) => {
     setForm((prev) => ({ ...prev, [field]: e.target.value }));
   };
 
   const handleSubmit = async () => {
-    if (!form.programId || !form.name || !form.amount || !form.expiryDate || !form.totalSupply) {
-      showToast("모든 항목을 입력해주세요.");
+    if (!form.name || !form.maxValue || !form.totalSupply || !form.validFrom || !form.validUntil) {
+      showToast("필수 항목을 모두 입력해주세요.");
       return;
     }
     if (!walletAddress) {
@@ -43,36 +50,38 @@ export default function AdminCreate() {
       return;
     }
 
-    const programId = Number(form.programId);
-    const amount = Number(form.amount);
+    const maxValue = Number(form.maxValue);
     const totalSupply = Number(form.totalSupply);
-    const expiryTimestamp = Math.floor(new Date(form.expiryDate).getTime() / 1000);
 
-    if (isNaN(programId) || programId <= 0) { showToast("유효한 프로그램 ID를 입력해주세요."); return; }
-    if (isNaN(amount) || amount <= 0) { showToast("유효한 금액을 입력해주세요."); return; }
+    if (isNaN(maxValue) || maxValue <= 0) { showToast("유효한 최대 금액을 입력해주세요."); return; }
     if (isNaN(totalSupply) || totalSupply <= 0) { showToast("유효한 발행 수량을 입력해주세요."); return; }
-    if (isNaN(expiryTimestamp)) { showToast("유효한 만료일을 선택해주세요."); return; }
+
+    const validFromIso = toLocalDateTime(form.validFrom);
+    const validUntilIso = toLocalDateTime(form.validUntil);
+
+    if (new Date(validFromIso).getTime() >= new Date(validUntilIso).getTime()) {
+      showToast("유효 종료일은 시작일 이후여야 합니다.");
+      return;
+    }
 
     setLoading(true);
     try {
-      // 1) 컨트랙트 트랜잭션
-      await createVoucherProgram(programId, form.name, amount, expiryTimestamp, totalSupply, form.category);
-
-      // 2) 백엔드 저장
-      await createProgram({
-        programId,
+      const res = await createVoucherProgram({
+        walletAddress,
         name: form.name,
-        amount,
-        expiryDate: form.expiryDate,
+        description: form.description || undefined,
+        maxValue,
         totalSupply,
         category: form.category,
-        issuerWallet: walletAddress,
+        validFrom: validFromIso,
+        validUntil: validUntilIso,
       });
 
-      showToast("프로그램이 생성되었습니다!", "success");
+      showToast(`프로그램 #${res.id} "${res.name}" 생성 완료!`, "success");
       setTimeout(() => navigate("/admin/home"), 1500);
     } catch (err: any) {
-      showToast(err?.message ?? "프로그램 생성에 실패했습니다.");
+      const backendMsg = err?.response?.data?.message;
+      showToast(backendMsg ?? err?.message ?? "프로그램 생성에 실패했습니다.");
     } finally {
       setLoading(false);
     }
@@ -94,30 +103,48 @@ export default function AdminCreate() {
 
       {/* 폼 */}
       <div className="px-6 mt-5 space-y-4 pb-6">
-        {[
-          { label: "프로그램 ID", field: "programId" as const, type: "number", placeholder: "예: 1" },
-          { label: "프로그램 이름", field: "name" as const, type: "text", placeholder: "예: 청년 식비 지원 바우처" },
-          { label: "바우처 금액 (원)", field: "amount" as const, type: "number", placeholder: "예: 50000" },
-          { label: "총 발행 수량", field: "totalSupply" as const, type: "number", placeholder: "예: 100" },
-        ].map(({ label, field, type, placeholder }) => (
-          <div key={field}>
-            <label className="text-sm font-semibold text-v-text block mb-1.5">{label}</label>
-            <input
-              type={type}
-              value={form[field]}
-              onChange={handleChange(field)}
-              placeholder={placeholder}
-              className="w-full px-4 py-3 rounded-v-md border border-v-border bg-v-surface text-v-text text-sm outline-none focus:border-v-accent transition-colors"
-            />
-          </div>
-        ))}
+        <div>
+          <label className="text-sm font-semibold text-v-text block mb-1.5">프로그램 이름</label>
+          <input
+            type="text"
+            value={form.name}
+            onChange={handleChange("name")}
+            placeholder="예: 청년 식비 지원 바우처"
+            className="w-full px-4 py-3 rounded-v-md border border-v-border bg-v-surface text-v-text text-sm outline-none focus:border-v-accent transition-colors"
+          />
+        </div>
 
         <div>
-          <label className="text-sm font-semibold text-v-text block mb-1.5">유효기간</label>
+          <label className="text-sm font-semibold text-v-text block mb-1.5">
+            설명 <span className="text-v-textMuted font-normal">(선택)</span>
+          </label>
+          <textarea
+            value={form.description}
+            onChange={handleChange("description")}
+            placeholder="프로그램에 대한 간단한 설명"
+            rows={2}
+            className="w-full px-4 py-3 rounded-v-md border border-v-border bg-v-surface text-v-text text-sm outline-none focus:border-v-accent transition-colors resize-none"
+          />
+        </div>
+
+        <div>
+          <label className="text-sm font-semibold text-v-text block mb-1.5">최대 금액 (원)</label>
           <input
-            type="date"
-            value={form.expiryDate}
-            onChange={handleChange("expiryDate")}
+            type="number"
+            value={form.maxValue}
+            onChange={handleChange("maxValue")}
+            placeholder="예: 50000"
+            className="w-full px-4 py-3 rounded-v-md border border-v-border bg-v-surface text-v-text text-sm outline-none focus:border-v-accent transition-colors"
+          />
+        </div>
+
+        <div>
+          <label className="text-sm font-semibold text-v-text block mb-1.5">총 발행 수량</label>
+          <input
+            type="number"
+            value={form.totalSupply}
+            onChange={handleChange("totalSupply")}
+            placeholder="예: 100"
             className="w-full px-4 py-3 rounded-v-md border border-v-border bg-v-surface text-v-text text-sm outline-none focus:border-v-accent transition-colors"
           />
         </div>
@@ -135,6 +162,26 @@ export default function AdminCreate() {
           </select>
         </div>
 
+        <div>
+          <label className="text-sm font-semibold text-v-text block mb-1.5">유효 시작일</label>
+          <input
+            type="datetime-local"
+            value={form.validFrom}
+            onChange={handleChange("validFrom")}
+            className="w-full px-4 py-3 rounded-v-md border border-v-border bg-v-surface text-v-text text-sm outline-none focus:border-v-accent transition-colors"
+          />
+        </div>
+
+        <div>
+          <label className="text-sm font-semibold text-v-text block mb-1.5">유효 종료일</label>
+          <input
+            type="datetime-local"
+            value={form.validUntil}
+            onChange={handleChange("validUntil")}
+            className="w-full px-4 py-3 rounded-v-md border border-v-border bg-v-surface text-v-text text-sm outline-none focus:border-v-accent transition-colors"
+          />
+        </div>
+
         <button
           onClick={handleSubmit}
           disabled={loading}
@@ -143,7 +190,7 @@ export default function AdminCreate() {
           {loading ? (
             <>
               <span className="w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-              처리 중...
+              프로그램 생성 중...
             </>
           ) : "프로그램 생성"}
         </button>

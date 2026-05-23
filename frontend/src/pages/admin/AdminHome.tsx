@@ -72,18 +72,24 @@ export default function AdminHome() {
       </div>
 
       {/* 빠른 액세스 */}
-      <div className="px-6 mt-3 flex gap-3">
+      <div className="px-6 mt-3 grid grid-cols-3 gap-2">
         <button
           onClick={() => navigate("/admin/create")}
-          className="flex-1 py-3.5 rounded-v-md bg-v-accentLight text-v-accent text-sm font-semibold active:bg-v-accent/20 transition-colors"
+          className="py-3.5 rounded-v-md bg-v-accentLight text-v-accent text-[13px] font-semibold active:bg-v-accent/20 transition-colors"
         >
           프로그램 생성
         </button>
         <button
           onClick={() => navigate("/admin/issue")}
-          className="flex-1 py-3.5 rounded-v-md bg-v-accentLight text-v-accent text-sm font-semibold active:bg-v-accent/20 transition-colors"
+          className="py-3.5 rounded-v-md bg-v-accentLight text-v-accent text-[13px] font-semibold active:bg-v-accent/20 transition-colors"
         >
           바우처 발급
+        </button>
+        <button
+          onClick={() => navigate("/admin/merchant-approve")}
+          className="py-3.5 rounded-v-md bg-v-accentLight text-v-accent text-[13px] font-semibold active:bg-v-accent/20 transition-colors"
+        >
+          가맹점 승인
         </button>
       </div>
 

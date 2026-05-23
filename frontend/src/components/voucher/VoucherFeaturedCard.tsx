@@ -1,14 +1,37 @@
 import React from "react";
-import { Voucher, STATUS_LABEL } from "../../types/voucher";
+import { VoucherResponse, VoucherStatus } from "../../services/voucherApi";
+import { getCategoryIcon, expiryBadge } from "../../types/voucher";
 
 interface Props {
-  voucher: Voucher;
+  voucher: VoucherResponse;
   onClick?: () => void;
 }
 
+const STATUS_LABEL: Record<VoucherStatus, string> = {
+  PENDING: "발급 중",
+  ACTIVE: "사용 가능",
+  USED_UP: "사용 완료",
+  BURNED: "소각됨",
+};
+
 export default function VoucherFeaturedCard({ voucher, onClick }: Props) {
-  const shortAddress = `${voucher.tokenAddress.slice(0, 6)}...${voucher.tokenAddress.slice(-4)}`;
-  const formattedAmount = voucher.remainingAmount.toLocaleString("ko-KR") + "원";
+  const wallet = voucher.ownerWallet ?? "";
+  const shortAddress = wallet
+    ? `${wallet.slice(0, 6)}...${wallet.slice(-4)}`
+    : voucher.onChainTokenId != null
+      ? `Token #${voucher.onChainTokenId}`
+      : "";
+  const formattedAmount = voucher.currentValue.toLocaleString("ko-KR") + "원";
+  const isActive = voucher.status === "ACTIVE";
+  const icon = getCategoryIcon(voucher.programCategory);
+  const expiry = expiryBadge(voucher.programValidUntil);
+  // Featured 카드는 어두운 배경이라 별도 tone 클래스 대신 직접 색을 지정.
+  const expiryColorClass =
+    expiry.tone === "expired"
+      ? "bg-red-500/30 text-red-100"
+      : expiry.tone === "warn"
+        ? "bg-amber-400/30 text-amber-50"
+        : "bg-white/20 text-white";
 
   return (
     <div
@@ -42,24 +65,31 @@ export default function VoucherFeaturedCard({ voucher, onClick }: Props) {
       />
 
       {/* 카드 내용 */}
-      <p className="text-xs font-medium text-white/75 tracking-wide">
-        {voucher.name}
-      </p>
+      <div className="flex items-center gap-2">
+        <span className="text-lg leading-none" aria-hidden>
+          {icon}
+        </span>
+        <p className="text-xs font-medium text-white/75 tracking-wide truncate">
+          {voucher.programName}
+        </p>
+      </div>
       <p className="mt-3 text-3xl font-bold text-white tracking-tight">
         {formattedAmount}
       </p>
 
-      {/* 상태 뱃지 */}
-      <div className="mt-1 flex items-center gap-2">
-        {voucher.status === "active" && (
-          <span className="inline-flex items-center gap-1.5 text-xs font-semibold rounded-full px-2.5 py-0.5 bg-white/20 text-white">
+      {/* 상태 + 만료 뱃지 */}
+      <div className="mt-1 flex items-center gap-2 flex-wrap">
+        <span className="inline-flex items-center gap-1.5 text-xs font-semibold rounded-full px-2.5 py-0.5 bg-white/20 text-white">
+          {isActive && (
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" />
-            {STATUS_LABEL[voucher.status]}
-          </span>
-        )}
-        {voucher.status !== "active" && (
-          <span className="inline-flex items-center gap-1 text-xs font-semibold rounded-full px-2.5 py-0.5 bg-white/20 text-white">
-            {STATUS_LABEL[voucher.status]}
+          )}
+          {STATUS_LABEL[voucher.status]}
+        </span>
+        {expiry.days !== null && (
+          <span
+            className={`inline-flex items-center text-xs font-semibold rounded-full px-2.5 py-0.5 ${expiryColorClass}`}
+          >
+            {expiry.label}
           </span>
         )}
       </div>
@@ -67,7 +97,11 @@ export default function VoucherFeaturedCard({ voucher, onClick }: Props) {
       {/* 하단 메타 */}
       <div className="mt-7 flex items-end justify-between">
         <span className="font-mono text-[11px] text-white/65">{shortAddress}</span>
-        <span className="text-xs text-white/80">~{voucher.expiresAt}</span>
+        {voucher.onChainTokenId != null && (
+          <span className="text-xs text-white/80">
+            Token #{voucher.onChainTokenId}
+          </span>
+        )}
       </div>
     </div>
   );

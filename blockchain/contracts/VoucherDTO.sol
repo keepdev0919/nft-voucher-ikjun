@@ -1,38 +1,26 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity >=0.8.0 <0.9.0;
 
-contract VoucherDTO {
+interface VoucherDTO {
     struct VoucherProgram {
         uint16 programId;
         address issuer;
         string name;
         uint256 amount;
-        uint256 expiryDate;     // timestamp
+        uint256 expiryDate;
         uint16 totalSupply;
+        uint16 mintedSupply;
         string category;
+        bool exists;
     }
 
     struct VoucherInfo {
         uint256 tokenId;
         uint16 programId;
         string programName;
-        uint256 amount;         // 잔액
+        uint256 amount;
         uint256 expiryDate;
-        uint16 status;          // 1: 미사용, 2: 사용완료, 3: 만료
+        uint16 status; // 1: active, 2: used, 3: expired
         address owner;
-    }
-
-    struct MerchantInfo {
-        address wallet;
-        string name;
-        string category;
-        bool isApproved;
-    }
-
-    struct UseRecord {
-        uint256 tokenId;
-        address merchant;
-        uint256 usedAmount;
-        uint256 usedAt;
     }
 }

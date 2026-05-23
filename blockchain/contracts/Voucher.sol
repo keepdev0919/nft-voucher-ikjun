@@ -1,115 +1,66 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.8.0 <0.9.0;
 
-import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
+import "@openzeppelin/contracts/utils/Counters.sol";
+import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import "./VoucherDTO.sol";
 
-/// @title Voucher
-/// @notice ERC-721 기반 Soulbound NFT 바우처 컨트랙트
-/// @dev 양도 불가(Soulbound), 기관이 발행하고 가맹점이 사용 처리
-contract Voucher is ERC721, VoucherDTO {
+contract Voucher is ERC721Enumerable, Ownable, EIP712, VoucherDTO {
+    using Counters for Counters.Counter;
 
-    // ──────────────────────────────────────────────
-    //  State variables
-    // ──────────────────────────────────────────────
+    bytes32 public constant USE_VOUCHER_TYPEHASH =
+        keccak256(
+            "UseVoucher(uint256 tokenId,address user,address merchant,uint256 amount,bytes32 recordCommitmentHash,uint256 nonce,uint256 deadline)"
+        );
 
-    /// @notice 컨트랙트 배포자(기관)
-    address public owner;
+    Counters.Counter private _tokenIds;
 
-    /// @dev 토큰 ID 카운터 (1부터 시작)
-    uint256 private _tokenIdCounter;
+    mapping(uint16 => VoucherProgram) private _voucherPrograms;
+    mapping(uint256 => VoucherInfo) private _voucherInfos;
+    mapping(uint256 => string) private _tokenURIs;
 
-    /// @notice programId => 바우처 프로그램 정보
-    mapping(uint16 => VoucherProgram) public programs;
+    mapping(uint256 => uint256) public voucherValue;
+    mapping(address => bool) public approvedMerchant;
+    mapping(uint256 => uint256) public useNonce;
 
-    /// @notice tokenId => 바우처 상세 정보
-    mapping(uint256 => VoucherInfo) public voucherInfos;
+    event VoucherProgramCreated(
+        uint16 indexed programId,
+        address indexed issuer,
+        string name,
+        uint256 amount,
+        uint256 expiryDate,
+        uint16 totalSupply,
+        string category
+    );
 
-    /// @notice 가맹점 주소 => 가맹점 정보
-    mapping(address => MerchantInfo) public merchants;
+    event VoucherMinted(
+        uint256 indexed tokenId,
+        uint16 indexed programId,
+        address indexed recipient,
+        uint256 amount,
+        uint256 expiryDate,
+        string tokenURI
+    );
 
-    /// @notice tokenId => 사용 기록 배열
-    mapping(uint256 => UseRecord[]) public useRecords;
+    event MerchantApproved(address indexed merchant, bool approved);
 
-    /// @dev address => 보유 tokenId 배열 (필터링 조회용)
-    mapping(address => uint256[]) private _tokensByOwner;
+    event VoucherUsed(
+        uint256 indexed tokenId,
+        address indexed user,
+        address indexed merchant,
+        uint256 amount,
+        uint256 oldValue,
+        uint256 newValue,
+        uint256 nonce,
+        bytes32 recordCommitmentHash,
+        bytes32 usageHash
+    );
 
-    // ──────────────────────────────────────────────
-    //  Events
-    // ──────────────────────────────────────────────
+    constructor() ERC721("Voucher", "VCHR") EIP712("Voucher", "1") {}
 
-    /// @notice 바우처 민팅 시 발생
-    event VoucherMinted(uint256 indexed tokenId, address indexed recipient, uint16 programId);
-
-    /// @notice 바우처 사용 시 발생
-    event VoucherUsed(uint256 indexed tokenId, address indexed merchant, uint256 usedAmount);
-
-    /// @notice 가맹점 승인 시 발생
-    event MerchantApproved(address indexed merchant);
-
-    // ──────────────────────────────────────────────
-    //  Errors
-    // ──────────────────────────────────────────────
-
-    error NotOwner();
-    error ProgramNotFound(uint16 programId);
-    error MintCapExceeded(uint16 programId);
-    error TokenNotFound(uint256 tokenId);
-    error NotVoucherOwner(uint256 tokenId, address caller);
-    error VoucherAlreadyUsed(uint256 tokenId);
-    error VoucherExpired(uint256 tokenId);
-    error MerchantNotApproved(address merchant);
-    error InsufficientBalance(uint256 tokenId, uint256 requested, uint256 available);
-    error MerchantAlreadyRegistered(address merchant);
-
-    // ──────────────────────────────────────────────
-    //  Modifiers
-    // ──────────────────────────────────────────────
-
-    modifier onlyOwner() {
-        if (msg.sender != owner) revert NotOwner();
-        _;
-    }
-
-    // ──────────────────────────────────────────────
-    //  Constructor
-    // ──────────────────────────────────────────────
-
-    constructor() ERC721("NFT Voucher", "VCHR") {
-        owner = msg.sender;
-    }
-
-    // ──────────────────────────────────────────────
-    //  Soulbound: 모든 전송 차단
-    // ──────────────────────────────────────────────
-
-    /// @dev 바우처는 양도 불가 — 모든 transferFrom 차단
-    function transferFrom(address, address, uint256) public pure override {
-        revert("Voucher: non-transferable");
-    }
-
-    /// @dev 바우처는 양도 불가 — safeTransferFrom(3 params) 차단
-    function safeTransferFrom(address, address, uint256) public pure override {
-        revert("Voucher: non-transferable");
-    }
-
-    /// @dev 바우처는 양도 불가 — safeTransferFrom(4 params) 차단
-    function safeTransferFrom(address, address, uint256, bytes memory) public pure override {
-        revert("Voucher: non-transferable");
-    }
-
-    // ──────────────────────────────────────────────
-    //  기관 함수 (onlyOwner)
-    // ──────────────────────────────────────────────
-
-    /// @notice 새로운 바우처 프로그램 생성
-    /// @param programId 프로그램 고유 ID
-    /// @param name 프로그램 이름
-    /// @param amount 바우처 초기 금액
-    /// @param expiryDate 만료 타임스탬프
-    /// @param totalSupply 최대 발행 수량
-    /// @param category 카테고리 (예: "식비", "교통")
-    /// @return 생성된 programId
     function createVoucherProgram(
         uint16 programId,
         string memory name,
@@ -118,206 +69,186 @@ contract Voucher is ERC721, VoucherDTO {
         uint16 totalSupply,
         string memory category
     ) public onlyOwner returns (uint16) {
-        programs[programId] = VoucherProgram({
-            programId: programId,
-            issuer: msg.sender,
-            name: name,
-            amount: amount,
-            expiryDate: expiryDate,
-            totalSupply: totalSupply,
-            category: category
-        });
+        require(programId != 0, "Voucher: invalid program");
+        require(!_voucherPrograms[programId].exists, "Voucher: program exists");
+        require(bytes(name).length > 0, "Voucher: empty name");
+        require(amount > 0, "Voucher: amount is zero");
+        require(expiryDate > block.timestamp, "Voucher: program expired");
+        require(totalSupply > 0, "Voucher: empty supply");
+
+        _voucherPrograms[programId] = VoucherProgram(
+            programId,
+            msg.sender,
+            name,
+            amount,
+            expiryDate,
+            totalSupply,
+            0,
+            category,
+            true
+        );
+
+        emit VoucherProgramCreated(programId, msg.sender, name, amount, expiryDate, totalSupply, category);
+
         return programId;
     }
 
-    /// @notice 특정 프로그램의 바우처를 수신자에게 민팅
-    /// @param programId 발행할 프로그램 ID
-    /// @param recipient 수신자 주소
-    /// @return 새로 발행된 tokenId
-    function mintVoucher(uint16 programId, address recipient) public onlyOwner returns (uint256) {
-        VoucherProgram storage program = programs[programId];
-        if (program.programId == 0) revert ProgramNotFound(programId);
+    function mintVoucher(
+        uint16 programId,
+        address recipient,
+        string memory uri
+    ) public onlyOwner returns (uint256) {
+        require(recipient != address(0), "Voucher: zero recipient");
 
-        // 발행 수량 검사: 해당 프로그램의 현재 민팅 수를 _mintCountByProgram으로 관리
-        if (_mintCountByProgram[programId] >= program.totalSupply) {
-            revert MintCapExceeded(programId);
-        }
+        VoucherProgram storage program = _voucherPrograms[programId];
+        require(program.exists, "Voucher: missing program");
+        require(program.mintedSupply < program.totalSupply, "Voucher: supply exceeded");
+        require(program.expiryDate > block.timestamp, "Voucher: program expired");
 
-        _tokenIdCounter++;
-        uint256 newTokenId = _tokenIdCounter;
+        _tokenIds.increment();
+        uint256 newTokenId = _tokenIds.current();
 
-        _mintCountByProgram[programId]++;
+        program.mintedSupply += 1;
 
         _mint(recipient, newTokenId);
+        _tokenURIs[newTokenId] = uri;
+        voucherValue[newTokenId] = program.amount;
+        _voucherInfos[newTokenId] = VoucherInfo(
+            newTokenId,
+            programId,
+            program.name,
+            program.amount,
+            program.expiryDate,
+            1,
+            recipient
+        );
 
-        voucherInfos[newTokenId] = VoucherInfo({
-            tokenId: newTokenId,
-            programId: programId,
-            programName: program.name,
-            amount: program.amount,
-            expiryDate: program.expiryDate,
-            status: 1,          // 미사용
-            owner: recipient
-        });
+        emit VoucherMinted(newTokenId, programId, recipient, program.amount, program.expiryDate, uri);
 
-        _tokensByOwner[recipient].push(newTokenId);
-
-        emit VoucherMinted(newTokenId, recipient, programId);
         return newTokenId;
     }
 
-    /// @notice 가맹점 승인
-    /// @param merchant 승인할 가맹점 주소
-    function approveMerchant(address merchant) public onlyOwner {
-        merchants[merchant].isApproved = true;
-        merchants[merchant].wallet = merchant;
-        emit MerchantApproved(merchant);
+    function approveMerchant(address merchant, bool approved) public onlyOwner {
+        require(merchant != address(0), "Voucher: zero merchant");
+        approvedMerchant[merchant] = approved;
+        emit MerchantApproved(merchant, approved);
     }
 
-    // ──────────────────────────────────────────────
-    //  사용자 함수
-    // ──────────────────────────────────────────────
-
-    /// @notice 호출자의 미사용(활성) 바우처 목록 반환
-    /// @return 활성 바우처 VoucherInfo 배열
-    function getMyActiveVouchers() public view returns (VoucherInfo[] memory) {
-        return _getVouchersByStatus(msg.sender, 1);
-    }
-
-    /// @notice 호출자의 사용완료 바우처 목록 반환
-    /// @return 사용완료 바우처 VoucherInfo 배열
-    function getMyUsedVouchers() public view returns (VoucherInfo[] memory) {
-        return _getVouchersByStatus(msg.sender, 2);
-    }
-
-    // ──────────────────────────────────────────────
-    //  가맹점 함수
-    // ──────────────────────────────────────────────
-
-    /// @notice 가맹점 등록 (승인은 별도로 기관이 진행)
-    /// @param name 가맹점 이름
-    /// @param category 가맹점 카테고리
-    function registerMerchant(string memory name, string memory category) public {
-        // 이미 등록된 주소는 재등록 불가
-        if (bytes(merchants[msg.sender].name).length > 0) {
-            revert MerchantAlreadyRegistered(msg.sender);
-        }
-        merchants[msg.sender] = MerchantInfo({
-            wallet: msg.sender,
-            name: name,
-            category: category,
-            isApproved: false
-        });
-    }
-
-    /// @notice 주소가 승인된 가맹점인지 확인
-    /// @param addr 확인할 주소
-    /// @return 승인 여부
-    function isMerchant(address addr) public view returns (bool) {
-        return merchants[addr].isApproved;
-    }
-
-    /// @notice 바우처 사용 처리
-    /// @dev msg.sender가 해당 바우처의 owner(수신자)여야 함 — 사용자가 서명
-    /// @param tokenId 사용할 바우처의 tokenId
-    /// @param usedAmount 사용 금액
-    /// @return 성공 여부
-    function useVoucher(uint256 tokenId, uint256 usedAmount) public returns (bool) {
-        VoucherInfo storage info = voucherInfos[tokenId];
-
-        // 토큰 존재 확인
-        if (info.tokenId == 0) revert TokenNotFound(tokenId);
-
-        // 바우처 소유자 확인 (사용자가 직접 서명)
-        if (info.owner != msg.sender) revert NotVoucherOwner(tokenId, msg.sender);
-
-        // 상태 검사: 미사용(1)이어야 함
-        if (info.status != 1) revert VoucherAlreadyUsed(tokenId);
-
-        // 만료 검사
-        if (block.timestamp > info.expiryDate) revert VoucherExpired(tokenId);
-
-        // 잔액 검사
-        if (usedAmount > info.amount) {
-            revert InsufficientBalance(tokenId, usedAmount, info.amount);
-        }
-
-        // 가맹점 승인 검사 — useVoucher를 직접 호출하는 주체는 사용자이므로
-        // 프론트에서 가맹점 주소를 파라미터로 전달하지 않고,
-        // 실제 사용 흐름에서 가맹점 정보를 UseRecord에 기록하기 위해
-        // 별도 파라미터 없이 owner 본인 호출로 설계함.
-        // 가맹점 주소를 파라미터로 받아 검증하도록 확장 가능.
-
-        // Effects
-        info.amount -= usedAmount;
-
-        if (info.amount == 0) {
-            info.status = 2; // 사용완료
-        }
-
-        // UseRecord 추가 (merchant 필드는 msg.sender — 가맹점 단말이 아닌 소유자 서명 방식)
-        useRecords[tokenId].push(UseRecord({
-            tokenId: tokenId,
-            merchant: msg.sender,
-            usedAmount: usedAmount,
-            usedAt: block.timestamp
-        }));
-
-        emit VoucherUsed(tokenId, msg.sender, usedAmount);
+    function useVoucher(
+        uint256 tokenId,
+        address merchant,
+        uint256 amount,
+        bytes32 recordCommitmentHash
+    ) public returns (bool) {
+        require(ownerOf(tokenId) == msg.sender, "Voucher: caller is not owner");
+        _useVoucher(tokenId, msg.sender, merchant, amount, recordCommitmentHash);
         return true;
     }
 
-    /// @notice 바우처 유효성 검사
-    /// @param tokenId 검사할 tokenId
-    /// @return valid 유효 여부
-    /// @return info 바우처 상세 정보
-    function isValidVoucher(uint256 tokenId) public view returns (bool valid, VoucherInfo memory info) {
-        info = voucherInfos[tokenId];
+    function useVoucherByMerchant(
+        uint256 tokenId,
+        uint256 amount,
+        bytes32 recordCommitmentHash,
+        uint256 deadline,
+        bytes memory ownerSignature
+    ) public returns (bool) {
+        require(block.timestamp <= deadline, "Voucher: signature expired");
 
-        if (info.tokenId == 0) return (false, info);
-        if (info.status != 1) return (false, info);
-        if (block.timestamp > info.expiryDate) return (false, info);
-        if (info.amount == 0) return (false, info);
+        address user = ownerOf(tokenId);
+        uint256 nonce = useNonce[tokenId];
+        bytes32 structHash = keccak256(
+            abi.encode(USE_VOUCHER_TYPEHASH, tokenId, user, msg.sender, amount, recordCommitmentHash, nonce, deadline)
+        );
+        address signer = ECDSA.recover(_hashTypedDataV4(structHash), ownerSignature);
+        require(signer == user, "Voucher: invalid signature");
 
-        return (true, info);
+        _useVoucher(tokenId, user, msg.sender, amount, recordCommitmentHash);
+        return true;
     }
 
-    // ──────────────────────────────────────────────
-    //  Internal helpers
-    // ──────────────────────────────────────────────
+    function getVoucherInfo(uint256 tokenId) public view returns (VoucherInfo memory) {
+        require(_exists(tokenId), "Voucher: nonexistent token");
+        VoucherInfo memory info = _voucherInfos[tokenId];
+        info.amount = voucherValue[tokenId];
+        info.owner = ownerOf(tokenId);
+        if (block.timestamp > info.expiryDate && info.amount > 0) {
+            info.status = 3;
+        }
+        return info;
+    }
 
-    /// @dev 프로그램별 민팅 카운트 추적
-    mapping(uint16 => uint16) private _mintCountByProgram;
+    function getVoucherProgram(uint16 programId) public view returns (VoucherProgram memory) {
+        require(_voucherPrograms[programId].exists, "Voucher: missing program");
+        return _voucherPrograms[programId];
+    }
 
-    /// @dev 소유자와 status 기준으로 바우처 목록 필터링
-    function _getVouchersByStatus(address user, uint16 status)
-        private
-        view
-        returns (VoucherInfo[] memory)
-    {
-        uint256[] storage tokenIds = _tokensByOwner[user];
-        uint256 len = tokenIds.length;
+    function getTokenURI(uint256 tokenId) public view returns (string memory) {
+        require(_exists(tokenId), "Voucher: nonexistent token");
+        return _tokenURIs[tokenId];
+    }
 
-        // 1패스: 해당 status 개수 계산
-        uint256 count = 0;
-        for (uint256 i = 0; i < len; ) {
-            if (voucherInfos[tokenIds[i]].status == status) {
-                unchecked { count++; }
-            }
-            unchecked { i++; }
+    function tokenURI(uint256 tokenId) public view override returns (string memory) {
+        return getTokenURI(tokenId);
+    }
+
+    function isValidVoucher(uint256 tokenId) public view returns (bool, VoucherInfo memory) {
+        if (!_exists(tokenId)) {
+            VoucherInfo memory emptyInfo;
+            return (false, emptyInfo);
         }
 
-        // 2패스: 결과 배열 채우기
-        VoucherInfo[] memory result = new VoucherInfo[](count);
-        uint256 idx = 0;
-        for (uint256 i = 0; i < len; ) {
-            if (voucherInfos[tokenIds[i]].status == status) {
-                result[idx] = voucherInfos[tokenIds[i]];
-                unchecked { idx++; }
-            }
-            unchecked { i++; }
+        VoucherInfo memory info = getVoucherInfo(tokenId);
+        bool valid = info.status == 1 && info.amount > 0 && block.timestamp <= info.expiryDate;
+        return (valid, info);
+    }
+
+    function supportsInterface(bytes4 interfaceId) public view override(ERC721Enumerable) returns (bool) {
+        return super.supportsInterface(interfaceId);
+    }
+
+    function _useVoucher(
+        uint256 tokenId,
+        address user,
+        address merchant,
+        uint256 amount,
+        bytes32 recordCommitmentHash
+    ) private {
+        require(approvedMerchant[merchant], "Voucher: unapproved merchant");
+        require(amount > 0, "Voucher: amount is zero");
+        require(recordCommitmentHash != bytes32(0), "Voucher: empty record commitment");
+
+        VoucherInfo storage info = _voucherInfos[tokenId];
+        require(info.status == 1, "Voucher: inactive voucher");
+        require(block.timestamp <= info.expiryDate, "Voucher: expired voucher");
+
+        uint256 oldValue = voucherValue[tokenId];
+        require(oldValue >= amount, "Voucher: insufficient balance");
+
+        uint256 newValue = oldValue - amount;
+        uint256 nonce = useNonce[tokenId];
+        bytes32 usageHash = keccak256(
+            abi.encode(
+                recordCommitmentHash,
+                tokenId,
+                user,
+                merchant,
+                amount,
+                oldValue,
+                newValue,
+                nonce,
+                block.chainid,
+                address(this)
+            )
+        );
+
+        voucherValue[tokenId] = newValue;
+        useNonce[tokenId] = nonce + 1;
+        info.amount = newValue;
+        info.owner = user;
+        if (newValue == 0) {
+            info.status = 2;
         }
 
-        return result;
+        emit VoucherUsed(tokenId, user, merchant, amount, oldValue, newValue, nonce, recordCommitmentHash, usageHash);
     }
 }
