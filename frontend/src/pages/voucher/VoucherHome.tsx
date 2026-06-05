@@ -3,25 +3,13 @@ import { useNavigate } from "react-router-dom";
 import { useVoucherList } from "../../hooks/useVoucherList";
 import { useWallet } from "../../context/WalletContext";
 import VoucherListItem from "../../components/voucher/VoucherListItem";
-import PendingPaymentModal from "../../components/PendingPaymentModal";
 import Toast from "../../components/Toast";
-import {
-  getPendingUseRequests,
-  UseVoucherPrepareResponse,
-} from "../../services/voucherApi";
-
-// 폴링 주기 — 5초. 백오프는 두지 않는다(현재 백엔드 부하 미미하고,
-// 데모 환경에서 빠른 응답성이 더 중요). 401은 axios 인터셉터가 처리하므로
-// 여기서는 silent fail 처리하고 다음 tick에서 재시도한다.
-const POLL_INTERVAL_MS = 5000;
 
 export default function VoucherHome() {
   const navigate = useNavigate();
-  const { walletAddress, nickname, isAuthenticated } = useWallet();
-  const { vouchers, loading, error, fetchVouchers, refetch } = useVoucherList();
+  const { walletAddress, nickname } = useWallet();
+  const { vouchers, loading, error, fetchVouchers } = useVoucherList();
 
-  const [currentRequest, setCurrentRequest] =
-    useState<UseVoucherPrepareResponse | null>(null);
   const [toast, setToast] = useState<{
     message: string;
     type: "success" | "error";
@@ -31,57 +19,8 @@ export default function VoucherHome() {
     if (walletAddress) fetchVouchers(walletAddress);
   }, [walletAddress, fetchVouchers]);
 
-  // 결제 요청 폴링 — 인증/지갑 모두 있고 현재 모달에 표시 중인 요청이 없을 때만 동작.
-  // 모달이 열려 있는 동안엔 새 요청을 덮어쓰지 않는다 (사용자 입력 보호).
-  useEffect(() => {
-    if (!isAuthenticated || !walletAddress) return;
-    if (currentRequest) return; // 모달이 떠있는 동안엔 폴링 중단
-
-    let cancelled = false;
-    let timerId: number | null = null;
-
-    const poll = async () => {
-      try {
-        const pending = await getPendingUseRequests();
-        if (cancelled) return;
-        if (pending.length > 0) {
-          // 가장 오래된(첫 번째) 요청을 우선 표시. 백엔드가 정렬 보장 안 하면
-          // deadline 기준 정렬을 시도 — 만료가 가까운 것부터.
-          const sorted = [...pending].sort((a, b) => a.deadline - b.deadline);
-          setCurrentRequest(sorted[0]);
-          return; // 모달이 열리면 setState로 effect가 다시 돌아 cleanup된다.
-        }
-      } catch (e) {
-        // 401은 axios 인터셉터가 /login으로 보내므로 여기선 무시.
-        // 그 외 네트워크 오류도 silent fail — 사용자에게 노출하면 노이즈.
-      }
-      if (!cancelled) {
-        timerId = window.setTimeout(poll, POLL_INTERVAL_MS);
-      }
-    };
-
-    poll();
-
-    return () => {
-      cancelled = true;
-      if (timerId !== null) window.clearTimeout(timerId);
-    };
-  }, [isAuthenticated, walletAddress, currentRequest]);
-
   const activeVouchers = vouchers.filter((v) => v.status === "ACTIVE");
   const total = activeVouchers.reduce((sum, v) => sum + v.currentValue, 0);
-
-  const handlePaymentSuccess = () => {
-    setCurrentRequest(null);
-    setToast({ message: "결제가 완료되었습니다!", type: "success" });
-    refetch();
-  };
-
-  const handlePaymentDismiss = () => {
-    // 거부/X 클릭 — 백엔드 cancel API가 없으므로 상태만 닫는다.
-    // 다음 폴링 tick에서 같은 요청이 다시 떠오를 수 있음 (deadline 만료 전까지).
-    setCurrentRequest(null);
-  };
 
   return (
     <div className="min-h-full">
@@ -193,16 +132,6 @@ export default function VoucherHome() {
           </div>
         )}
       </div>
-
-      {/* 결제 요청 모달 */}
-      {currentRequest && walletAddress && (
-        <PendingPaymentModal
-          request={currentRequest}
-          walletAddress={walletAddress}
-          onSuccess={handlePaymentSuccess}
-          onDismiss={handlePaymentDismiss}
-        />
-      )}
 
       {/* 토스트 */}
       {toast && (

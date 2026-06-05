@@ -1,11 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import QRCode from "react-qr-code";
 import {
   getVoucher,
-  getVoucherQrData,
   VoucherResponse,
-  VoucherQrResponse,
   VoucherStatus,
 } from "../../services/voucherApi";
 import { useWallet } from "../../context/WalletContext";
@@ -40,11 +37,6 @@ export default function VoucherDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [qrData, setQrData] = useState<VoucherQrResponse | null>(null);
-  const [qrLoading, setQrLoading] = useState(false);
-  const [qrError, setQrError] = useState<string | null>(null);
-  const [showQR, setShowQR] = useState(false);
-
   const voucherId = Number(id);
 
   const loadVoucher = React.useCallback(async () => {
@@ -72,21 +64,6 @@ export default function VoucherDetail() {
   useEffect(() => {
     void loadVoucher();
   }, [loadVoucher]);
-
-  const openQR = async () => {
-    setShowQR(true);
-    if (qrData || qrLoading) return;
-    setQrLoading(true);
-    setQrError(null);
-    try {
-      const data = await getVoucherQrData(voucherId);
-      setQrData(data);
-    } catch (e: any) {
-      setQrError(e?.response?.data?.message ?? "QR 정보를 불러오지 못했습니다.");
-    } finally {
-      setQrLoading(false);
-    }
-  };
 
   if (loading) {
     return (
@@ -144,9 +121,6 @@ export default function VoucherDetail() {
       : expiry.tone === "expired"
         ? `${expiryDateLabel}까지 (만료됨)`
         : `${expiryDateLabel}까지 (${expiry.label})`;
-
-  // TODO: 결제 흐름이 가맹점 QR → 사용자 스캔으로 변경됨. 이 QR은 임시.
-  const qrPayload = qrData ? JSON.stringify(qrData) : "";
 
   return (
     <div className="min-h-full">
@@ -253,45 +227,14 @@ export default function VoucherDetail() {
         )}
       </div>
 
-      {/* 사용하기 버튼 */}
+      {/* 결제하기 버튼 — 가맹점 QR 스캔 플로우로 이동 */}
       {isActive && (
         <div className="px-6 mt-5 pb-8">
           <button
-            onClick={openQR}
+            onClick={() => navigate("/voucher/pay")}
             className="w-full py-4 rounded-v-lg bg-v-accent text-white font-semibold text-[15px] shadow-v-md active:bg-v-accentHover transition-colors"
           >
-            사용하기
-          </button>
-        </div>
-      )}
-
-      {/* QR 전체화면 오버레이 */}
-      {/* TODO: 결제 흐름이 가맹점 QR → 사용자 스캔으로 변경됨. 이 QR은 임시. */}
-      {showQR && (
-        <div className="fixed inset-0 bg-black/90 z-50 flex flex-col items-center justify-center px-8">
-          <p className="text-white/60 text-sm mb-2">{voucher.programName}</p>
-          <p className="text-white text-[28px] font-bold mb-6">{formattedCurrent}</p>
-
-          <div className="bg-white p-5 rounded-2xl shadow-2xl min-w-[260px] min-h-[260px] flex items-center justify-center">
-            {qrLoading ? (
-              <span className="w-8 h-8 border-2 border-v-border border-t-v-accent rounded-full animate-spin" />
-            ) : qrError ? (
-              <p className="text-red-600 text-xs text-center px-4">{qrError}</p>
-            ) : qrPayload ? (
-              <QRCode value={qrPayload} size={220} />
-            ) : null}
-          </div>
-
-          <p className="text-white/40 text-xs mt-5 font-mono">{tokenLabel}</p>
-          <p className="text-white/50 text-sm mt-3 text-center">
-            가맹점에 이 QR 코드를 보여주세요
-          </p>
-
-          <button
-            onClick={() => setShowQR(false)}
-            className="mt-10 px-8 py-3 rounded-full bg-white/15 text-white text-sm font-medium"
-          >
-            닫기
+            결제하기 (QR 스캔)
           </button>
         </div>
       )}

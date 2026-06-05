@@ -72,18 +72,6 @@ export interface VoucherResponse {
   createdAt: string;
 }
 
-export interface VoucherQrResponse {
-  voucherId: number;
-  ownerWallet: string;
-  ownerNickname: string;
-  onChainTokenId: number | null;
-  currentValue: number;
-  programName: string;
-  category: string; // 백엔드는 QR 응답에서 SHORT 명(category)을 사용
-  expiryDate: string | null;
-  isValid: boolean; // 백엔드 계산: ACTIVE + currentValue>0 + not expired
-}
-
 export interface UseVoucherPrepareResponse {
   historyId: number;
   voucherId: number;          // executeUse 호출 시 경로 변수로 필요
@@ -157,12 +145,6 @@ export interface UseVoucherPrepareRequestDto {
 export interface UseVoucherRequestDto {
   historyId: number;
   ownerSignature: string;
-}
-
-export interface MerchantPrepareRequestDto {
-  voucherId: number;
-  ownerWallet: string;
-  amount: number;
 }
 
 // =============================================================================
@@ -282,22 +264,6 @@ export async function getVoucher(
   return res.data.data;
 }
 
-export async function getVoucherQrData(id: number): Promise<VoucherQrResponse> {
-  const res = await axiosApi.get<ApiResponse<VoucherQrResponse>>(
-    `/api/vouchers/${id}/qr`
-  );
-  return res.data.data;
-}
-
-export async function getPendingUseRequests(): Promise<
-  UseVoucherPrepareResponse[]
-> {
-  const res = await axiosApi.get<ApiResponse<UseVoucherPrepareResponse[]>>(
-    `/api/vouchers/pending-use`
-  );
-  return res.data.data;
-}
-
 export async function prepareUseVoucher(
   id: number,
   req: UseVoucherPrepareRequestDto
@@ -315,20 +281,6 @@ export async function executeUseVoucher(
 ): Promise<VoucherUseHistoryResponse> {
   const res = await axiosApi.post<ApiResponse<VoucherUseHistoryResponse>>(
     `/api/vouchers/${id}/use`,
-    req
-  );
-  return res.data.data;
-}
-
-// =============================================================================
-// Merchant
-// =============================================================================
-
-export async function merchantPrepareUse(
-  req: MerchantPrepareRequestDto
-): Promise<UseVoucherPrepareResponse> {
-  const res = await axiosApi.post<ApiResponse<UseVoucherPrepareResponse>>(
-    `/api/merchant/vouchers/use/prepare`,
     req
   );
   return res.data.data;
