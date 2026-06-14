@@ -13,6 +13,12 @@ public enum ErrorCode {
     WALLET_ALREADY_EXISTS(HttpStatus.CONFLICT, "이미 등록된 지갑 주소입니다."),
     NOT_ADMIN(HttpStatus.FORBIDDEN, "관리자 권한이 필요합니다."),
     NOT_MERCHANT(HttpStatus.BAD_REQUEST, "가맹점 회원이 아닙니다."),
+    NOT_USER(HttpStatus.BAD_REQUEST, "일반 사용자 회원이 아닙니다."),
+
+    // 바우처 자격요건
+    ELIGIBILITY_AGE(HttpStatus.BAD_REQUEST, "나이 요건을 충족하지 않습니다."),
+    ELIGIBILITY_REGION(HttpStatus.BAD_REQUEST, "지역 요건을 충족하지 않습니다."),
+    ALREADY_ISSUED(HttpStatus.CONFLICT, "이미 발급받은 바우처 프로그램입니다."),
 
     // VoucherProgram
     VOUCHER_PROGRAM_NOT_FOUND(HttpStatus.NOT_FOUND, "바우처 프로그램을 찾을 수 없습니다."),
@@ -33,15 +39,7 @@ public enum ErrorCode {
     MINT_TIMEOUT(HttpStatus.GATEWAY_TIMEOUT, "블록체인 트랜잭션 응답 대기 시간이 초과되었습니다. (40초)"),
     USE_HISTORY_NOT_FOUND(HttpStatus.NOT_FOUND, "바우처 사용 이력을 찾을 수 없습니다."),
     USE_ALREADY_PROCESSED(HttpStatus.BAD_REQUEST, "이미 처리된 결제 요청입니다."),
-    USE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "바우처 사용 처리에 실패했습니다."),
-
-    // PaymentSession
-    PAYMENT_SESSION_NOT_FOUND(HttpStatus.NOT_FOUND, "결제 세션을 찾을 수 없습니다."),
-    PAYMENT_SESSION_NOT_PENDING(HttpStatus.BAD_REQUEST, "대기 중인 결제 세션이 아닙니다."),
-    PAYMENT_SESSION_EXPIRED(HttpStatus.GONE, "만료된 결제 세션입니다."),
-    PAYMENT_SESSION_AMOUNT_MISMATCH(HttpStatus.BAD_REQUEST, "결제 세션 금액이 일치하지 않습니다."),
-    PAYMENT_SESSION_MERCHANT_MISMATCH(HttpStatus.FORBIDDEN, "결제 세션 가맹점이 일치하지 않습니다."),
-    FORBIDDEN(HttpStatus.FORBIDDEN, "접근 권한이 없습니다.");
+    USE_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "바우처 사용 처리에 실패했습니다.");
 
     private final HttpStatus httpStatus;
     private final String message;

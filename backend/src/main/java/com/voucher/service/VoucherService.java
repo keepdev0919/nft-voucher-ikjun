@@ -2,15 +2,14 @@ package com.voucher.service;
 
 import com.voucher.blockchain.BlockchainService;
 import com.voucher.domain.Member;
-import com.voucher.domain.PaymentSession;
 import com.voucher.domain.Voucher;
 import com.voucher.domain.VoucherProgram;
 import com.voucher.domain.VoucherUseHistory;
-import com.voucher.domain.enums.PaymentSessionStatus;
 import com.voucher.domain.enums.ProgramStatus;
 import com.voucher.domain.enums.Role;
 import com.voucher.domain.enums.UseStatus;
 import com.voucher.domain.enums.VoucherStatus;
+import com.voucher.dto.request.ApplyVoucherRequest;
 import com.voucher.dto.request.CreateVoucherRequest;
 import com.voucher.dto.request.MerchantPrepareRequest;
 import com.voucher.dto.request.UseVoucherPrepareRequest;
@@ -22,7 +21,6 @@ import com.voucher.dto.response.VoucherResponse;
 import com.voucher.dto.response.VoucherUseHistoryResponse;
 import com.voucher.exception.BusinessException;
 import com.voucher.exception.ErrorCode;
-import com.voucher.repository.PaymentSessionRepository;
 import com.voucher.repository.VoucherRepository;
 import com.voucher.repository.VoucherUseHistoryRepository;
 import lombok.RequiredArgsConstructor;
@@ -35,6 +33,9 @@ import org.web3j.protocol.core.methods.response.TransactionReceipt;
 
 import java.math.BigInteger;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.Period;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -52,8 +53,6 @@ public class VoucherService {
     private final VoucherProgramService voucherProgramService;
     private final BlockchainService blockchainService;
     private final VoucherPersistenceService voucherPersistenceService;
-    private final PaymentSessionService paymentSessionService;
-    private final PaymentSessionRepository paymentSessionRepository;
 
     @Value("${app.base-url:http://localhost:8080}")
     private String baseUrl;
@@ -70,12 +69,7 @@ public class VoucherService {
      *  ⑥ DB 업데이트    VoucherPersistenceService → 즉시 커밋 (status = ACTIVE)
      */
     @Transactional(propagation = Propagation.NOT_SUPPORTED) // 외부 트랜잭션 없이 실행 — 각 단계가 독립 커밋
-    public ApiResponse<VoucherResponse> issueVoucher(CreateVoucherRequest request, String requesterWallet) {
-        Member requester = memberService.findByWalletOrThrow(requesterWallet);
-        if (requester.getRole() != Role.ADMIN) {
-            throw new BusinessException(ErrorCode.NOT_ADMIN);
-        }
-
+    public ApiResponse<VoucherResponse> issueVoucher(CreateVoucherRequest request) {
         Member owner = memberService.findByWalletOrThrow(request.getWalletAddress());
         VoucherProgram program = voucherProgramService.findByIdOrThrow(request.getVoucherProgramId());
 
@@ -114,6 +108,78 @@ public class VoucherService {
                 voucher.getId(), tokenId, txHash, receipt.getBlockNumber().longValue());
 
         log.info("바우처 발급 완료 — voucherId: {}, tokenId: {}, txHash: {}", voucher.getId(), tokenId, txHash);
+        return ApiResponse.success(response);
+    }
+
+    /**
+     * 사용자 자동 신청 — 자격요건 확인 후 민팅
+     */
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public ApiResponse<VoucherResponse> applyVoucher(ApplyVoucherRequest request) {
+        Member owner = memberService.findByWalletOrThrow(request.getWalletAddress());
+        if (owner.getRole() != com.voucher.domain.enums.Role.USER) {
+            throw new BusinessException(ErrorCode.NOT_USER);
+        }
+
+        VoucherProgram program = voucherProgramService.findByIdOrThrow(request.getVoucherProgramId());
+        if (program.getStatus() != ProgramStatus.ACTIVE) {
+            throw new BusinessException(ErrorCode.VOUCHER_PROGRAM_INACTIVE);
+        }
+
+        // 중복 신청 방지
+        if (voucherRepository.existsByOwnerAndVoucherProgram_Id(owner, program.getId())) {
+            throw new BusinessException(ErrorCode.ALREADY_ISSUED);
+        }
+
+        // 나이 요건 확인
+        if (owner.getBirthDate() != null) {
+            int age = Period.between(owner.getBirthDate(), LocalDate.now()).getYears();
+            if (program.getMinAge() != null && age < program.getMinAge()) {
+                throw new BusinessException(ErrorCode.ELIGIBILITY_AGE);
+            }
+            if (program.getMaxAge() != null && age > program.getMaxAge()) {
+                throw new BusinessException(ErrorCode.ELIGIBILITY_AGE);
+            }
+        }
+
+        // 지역 요건 확인
+        String allowedRegions = program.getAllowedRegions();
+        if (allowedRegions != null && !allowedRegions.isBlank()) {
+            List<String> allowed = Arrays.asList(allowedRegions.split(","));
+            String memberRegion = owner.getRegion() != null ? owner.getRegion().trim() : "";
+            boolean matched = allowed.stream().anyMatch(r -> r.trim().equals(memberRegion));
+            if (!matched) {
+                throw new BusinessException(ErrorCode.ELIGIBILITY_REGION);
+            }
+        }
+
+        // 자격 통과 — 기존 민팅 로직 재사용
+        Voucher voucher = voucherPersistenceService.createPendingVoucher(
+                owner.getId(), program.getId(), baseUrl);
+
+        String txHash;
+        try {
+            txHash = blockchainService.sendMintTx(program.getId().intValue(), owner.getWalletAddress(), voucher.getTokenUri());
+        } catch (Exception e) {
+            log.error("자동 신청 tx 전송 실패 — wallet: {}, programId: {}", owner.getWalletAddress(), program.getId(), e);
+            throw new BusinessException(ErrorCode.MINT_FAILED);
+        }
+
+        voucherPersistenceService.persistTxHash(voucher.getId(), txHash);
+
+        org.web3j.protocol.core.methods.response.TransactionReceipt receipt;
+        try {
+            receipt = blockchainService.waitForReceipt(txHash);
+        } catch (Exception e) {
+            log.error("자동 신청 Receipt 타임아웃 — txHash: {}", txHash, e);
+            throw new BusinessException(ErrorCode.MINT_TIMEOUT);
+        }
+
+        Long tokenId = blockchainService.extractTokenId(receipt);
+        VoucherResponse response = voucherPersistenceService.confirmMinting(
+                voucher.getId(), tokenId, txHash, receipt.getBlockNumber().longValue());
+
+        log.info("자동 신청 완료 — voucherId: {}, tokenId: {}", voucher.getId(), tokenId);
         return ApiResponse.success(response);
     }
 
@@ -215,7 +281,7 @@ public class VoucherService {
             throw new BusinessException(ErrorCode.NOT_MERCHANT);
         }
 
-        return ApiResponse.success(buildPrepareResponse(voucher, merchant, request.getAmount(), ownerWallet, request.getPaymentId()));
+        return ApiResponse.success(buildPrepareResponse(voucher, merchant, request.getAmount(), ownerWallet));
     }
 
     /**
@@ -239,12 +305,11 @@ public class VoucherService {
             throw new BusinessException(ErrorCode.VOUCHER_NOT_ACTIVE);
         }
 
-        return ApiResponse.success(buildPrepareResponse(voucher, merchant, request.getAmount(), request.getOwnerWallet(), null));
+        return ApiResponse.success(buildPrepareResponse(voucher, merchant, request.getAmount(), request.getOwnerWallet()));
     }
 
     private UseVoucherPrepareResponse buildPrepareResponse(Voucher voucher, Member merchant,
-                                                            Long amount, String ownerWallet,
-                                                            String paymentId) {
+                                                            Long amount, String ownerWallet) {
         long oldValue = voucher.getCurrentValue();
         long newValue = oldValue - amount;
         if (newValue < 0) {
@@ -272,13 +337,6 @@ public class VoucherService {
                 .status(UseStatus.PENDING)
                 .build();
         history = voucherUseHistoryRepository.save(history);
-
-        // 가맹점 QR 흐름: 결제 세션 검증 후 history에 paymentId 연결
-        if (paymentId != null && !paymentId.isBlank()) {
-            paymentSessionService.findAndValidate(paymentId, merchant.getWalletAddress(), amount);
-            history.setPaymentId(paymentId);
-            history = voucherUseHistoryRepository.save(history);
-        }
 
         // canonical JSON에는 실제 가맹점 지갑 기록 (오프체인 감사 추적용)
         String canonicalJson = buildCanonicalJson(history.getId(), voucher.getOnChainTokenId(),
@@ -352,17 +410,6 @@ public class VoucherService {
         VoucherUseHistoryResponse response = voucherPersistenceService.confirmUse(
                 history.getId(), txHash, receipt.getBlockNumber().longValue());
 
-        // 가맹점 QR 흐름: 결제 세션이 연결되어 있으면 COMPLETED 처리
-        if (history.getPaymentId() != null) {
-            paymentSessionRepository.findById(history.getPaymentId()).ifPresent(session -> {
-                if (session.getStatus() == PaymentSessionStatus.PENDING) {
-                    session.markCompleted(txHash);
-                    paymentSessionRepository.save(session);
-                    log.info("결제 세션 완료 — paymentId: {}, txHash: {}", session.getPaymentId(), txHash);
-                }
-            });
-        }
-
         log.info("바우처 사용 완료 — historyId: {}, txHash: {}", history.getId(), txHash);
         return ApiResponse.success(response);
     }
@@ -385,12 +432,18 @@ public class VoucherService {
         domain.put("name", "Voucher");
         domain.put("version", "1");
         domain.put("chainId", chainId);
-        // verifyingContract는 컨트랙트 주소여야 함 — EIP712 도메인 분리자가 address(this)를 사용
         domain.put("verifyingContract", blockchainService.getContractAddress());
 
-        // 필드명이 컨트랙트 TYPEHASH와 정확히 일치해야 서명 검증 통과
-        // USE_VOUCHER_TYPEHASH: "UseVoucher(uint256 tokenId,address user,address merchant,uint256 amount,bytes32 recordCommitmentHash,uint256 nonce,uint256 deadline)"
-        List<Map<String, String>> types = List.of(
+        // EIP712Domain 타입 정의는 MetaMask eth_signTypedData_v4에서 필수
+        List<Map<String, String>> domainTypes = List.of(
+                Map.of("name", "name", "type", "string"),
+                Map.of("name", "version", "type", "string"),
+                Map.of("name", "chainId", "type", "uint256"),
+                Map.of("name", "verifyingContract", "type", "address")
+        );
+
+        // 필드명·순서가 컨트랙트 USE_VOUCHER_TYPEHASH와 정확히 일치해야 서명 검증 통과
+        List<Map<String, String>> messageTypes = List.of(
                 Map.of("name", "tokenId", "type", "uint256"),
                 Map.of("name", "user", "type", "address"),
                 Map.of("name", "merchant", "type", "address"),
@@ -399,6 +452,10 @@ public class VoucherService {
                 Map.of("name", "nonce", "type", "uint256"),
                 Map.of("name", "deadline", "type", "uint256")
         );
+
+        Map<String, Object> typesMap = new LinkedHashMap<>();
+        typesMap.put("EIP712Domain", domainTypes);
+        typesMap.put("UseVoucher", messageTypes);
 
         Map<String, Object> message = new LinkedHashMap<>();
         message.put("tokenId", tokenId.toString());
@@ -410,11 +467,29 @@ public class VoucherService {
         message.put("deadline", Long.toString(deadline));
 
         Map<String, Object> eip712 = new LinkedHashMap<>();
-        eip712.put("domain", domain);
-        eip712.put("types", Map.of("UseVoucher", types));
+        eip712.put("types", typesMap);
         eip712.put("primaryType", "UseVoucher");
+        eip712.put("domain", domain);
         eip712.put("message", message);
         return eip712;
+    }
+
+    public ApiResponse<List<VoucherUseHistoryResponse>> getMerchantHistory(String merchantWallet) {
+        List<VoucherUseHistoryResponse> list = voucherUseHistoryRepository
+                .findAllByMerchant_WalletAddressIgnoreCaseOrderByIdDesc(merchantWallet)
+                .stream()
+                .map(VoucherUseHistoryResponse::from)
+                .collect(Collectors.toList());
+        return ApiResponse.success(list);
+    }
+
+    public ApiResponse<Map<String, String>> getPaymentStatus(Long historyId, String merchantWallet) {
+        VoucherUseHistory history = voucherUseHistoryRepository.findById(historyId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.USE_HISTORY_NOT_FOUND));
+        if (!history.getMerchant().getWalletAddress().equalsIgnoreCase(merchantWallet)) {
+            throw new BusinessException(ErrorCode.VOUCHER_ACCESS_DENIED);
+        }
+        return ApiResponse.success(Map.of("status", history.getStatus().name()));
     }
 
     public Voucher findByIdOrThrow(Long voucherId) {

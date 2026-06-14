@@ -16,7 +16,4 @@ public class UseVoucherPrepareRequest {
     @NotNull(message = "결제 금액은 필수입니다.")
     @Positive(message = "결제 금액은 양수여야 합니다.")
     private Long amount;
-
-    // 가맹점 QR 흐름에서 생성된 결제 세션 ID (선택값 — 사용자 QR 흐름에서는 null).
-    private String paymentId;
 }

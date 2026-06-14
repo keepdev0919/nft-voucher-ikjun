@@ -62,10 +62,6 @@ public class VoucherUseHistory {
     @Column(name = "used_at", updatable = false)
     private LocalDateTime usedAt;
 
-    // 가맹점 QR 흐름에서 결제 세션과 연결되는 ID (사용자 QR 흐름에서는 null).
-    @Column(name = "payment_id", length = 36)
-    private String paymentId;
-
     public void setMetadataInfo(String metadataJson, String metadataHash) {
         this.metadataJson = metadataJson;
         this.metadataHash = metadataHash;
@@ -75,9 +71,5 @@ public class VoucherUseHistory {
         this.txHash = txHash;
         this.blockNumber = blockNumber;
         this.status = UseStatus.CONFIRMED;
-    }
-
-    public void setPaymentId(String paymentId) {
-        this.paymentId = paymentId;
     }
 }
