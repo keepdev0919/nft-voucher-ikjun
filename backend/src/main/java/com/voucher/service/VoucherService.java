@@ -70,7 +70,12 @@ public class VoucherService {
      *  ⑥ DB 업데이트    VoucherPersistenceService → 즉시 커밋 (status = ACTIVE)
      */
     @Transactional(propagation = Propagation.NOT_SUPPORTED) // 외부 트랜잭션 없이 실행 — 각 단계가 독립 커밋
-    public ApiResponse<VoucherResponse> issueVoucher(CreateVoucherRequest request) {
+    public ApiResponse<VoucherResponse> issueVoucher(CreateVoucherRequest request, String requesterWallet) {
+        Member requester = memberService.findByWalletOrThrow(requesterWallet);
+        if (requester.getRole() != Role.ADMIN) {
+            throw new BusinessException(ErrorCode.NOT_ADMIN);
+        }
+
         Member owner = memberService.findByWalletOrThrow(request.getWalletAddress());
         VoucherProgram program = voucherProgramService.findByIdOrThrow(request.getVoucherProgramId());
 
