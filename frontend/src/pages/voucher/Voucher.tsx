@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import VoucherBottomNav from "../../components/VoucherBottomNav";
 import VoucherHome from "./VoucherHome";
@@ -26,6 +26,9 @@ function Voucher() {
     message: string;
     type: "success" | "error";
   } | null>(null);
+  // 사용자가 거부했거나 만료된 historyId는 더 이상 모달로 띄우지 않는다.
+  // 백엔드에 PENDING cancel API가 없어 클라이언트에서 차단.
+  const dismissedRef = useRef<Set<number>>(new Set());
 
   useEffect(() => {
     if (!isAuthenticated || !walletAddress) return;
@@ -38,8 +41,13 @@ function Voucher() {
       try {
         const pending = await getPendingUseRequests();
         if (cancelled) return;
-        if (pending.length > 0) {
-          const sorted = [...pending].sort((a, b) => a.deadline - b.deadline);
+        const now = Math.floor(Date.now() / 1000);
+        // 만료된 요청 + 이미 거부한 요청은 제외
+        const valid = pending.filter(
+          (p) => p.deadline > now && !dismissedRef.current.has(p.historyId)
+        );
+        if (valid.length > 0) {
+          const sorted = [...valid].sort((a, b) => a.deadline - b.deadline);
           setCurrentRequest(sorted[0]);
           return;
         }
@@ -65,6 +73,7 @@ function Voucher() {
   };
 
   const handlePaymentDismiss = () => {
+    if (currentRequest) dismissedRef.current.add(currentRequest.historyId);
     setCurrentRequest(null);
   };
 
