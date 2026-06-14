@@ -145,7 +145,7 @@ export default function QrScanner({
         hideCount
         containerStyle={{
           width: "100%",
-          paddingTop: 0,
+          height: "100%",
         }}
         videoStyle={{
           width: "100%",
