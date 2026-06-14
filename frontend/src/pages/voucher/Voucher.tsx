@@ -5,7 +5,6 @@ import VoucherHome from "./VoucherHome";
 import VoucherList from "./VoucherList";
 import VoucherDetail from "./VoucherDetail";
 import VoucherProgramList from "./VoucherProgramList";
-import VoucherPay from "./VoucherPay";
 import { useWallet } from "../../context/WalletContext";
 
 function Voucher() {
@@ -24,7 +23,6 @@ function Voucher() {
       <div className="h-full overflow-y-auto pb-16">
         <Routes>
           <Route path="/home" element={<VoucherHome />} />
-          <Route path="/pay" element={<VoucherPay />} />
           <Route path="/programs" element={<VoucherProgramList />} />
           <Route path="/list" element={<VoucherList />} />
           <Route path="/list/:id" element={<VoucherDetail />} />

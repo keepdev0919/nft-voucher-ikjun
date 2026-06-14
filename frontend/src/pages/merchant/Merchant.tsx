@@ -3,7 +3,6 @@ import { Routes, Route, Navigate, Link, useLocation } from "react-router-dom";
 import MerchantScan from "./MerchantScan";
 import MerchantVerify from "./MerchantVerify";
 import MerchantHistory from "./MerchantHistory";
-import MerchantPaymentRequest from "./MerchantPaymentRequest";
 import { useWallet } from "../../context/WalletContext";
 
 const NAV_ITEMS = [
@@ -67,7 +66,6 @@ export default function Merchant() {
       <div className="h-full overflow-y-auto pb-16">
         <Routes>
           <Route path="/home" element={<MerchantScan />} />
-          <Route path="/payment-request" element={<MerchantPaymentRequest />} />
           <Route path="/verify" element={<MerchantVerify />} />
           <Route path="/history" element={<MerchantHistory />} />
           <Route path="*" element={<Navigate to="/merchant/home" replace />} />

@@ -113,67 +113,9 @@ export default function MerchantScan() {
 
       {/* 헤더 */}
       <div className="px-6 pt-2">
-        <h1 className="text-xl font-semibold text-white">가맹점</h1>
+        <h1 className="text-xl font-semibold text-white">QR 스캔</h1>
         <p className="text-[13px] text-white/45 mt-0.5">
-          결제 방식을 선택하세요
-        </p>
-      </div>
-
-      {/* 메인 액션: 결제 받기 (QR 생성) — 신규 흐름 */}
-      <div className="px-6 mt-5">
-        <button
-          type="button"
-          onClick={() => navigate("/merchant/payment-request")}
-          className="w-full rounded-v-lg p-5 text-left relative overflow-hidden active:opacity-90 transition-opacity"
-          style={{
-            background: "linear-gradient(135deg, #2563EB 0%, #1E40AF 100%)",
-            boxShadow: "0 8px 24px rgba(0,0,0,0.18)",
-          }}
-        >
-          <div
-            className="absolute rounded-full pointer-events-none"
-            style={{
-              width: 160,
-              height: 160,
-              top: -40,
-              right: -40,
-              background: "rgba(255,255,255,0.08)",
-            }}
-          />
-          <div className="relative flex items-start gap-3">
-            <div className="w-11 h-11 rounded-v-md bg-white/15 flex items-center justify-center flex-shrink-0">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                strokeWidth={1.8}
-                stroke="currentColor"
-                className="w-6 h-6 text-white"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0 1 3.75 9.375v-4.5ZM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 0 1-1.125-1.125v-4.5ZM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0 1 13.5 9.375v-4.5Z"
-                />
-              </svg>
-            </div>
-            <div className="flex-1">
-              <p className="text-white text-base font-bold">결제 받기 (QR 생성)</p>
-              <p className="text-white/75 text-xs mt-1">
-                금액을 입력하면 QR이 생성됩니다. 사용자가 스캔하면 자동 결제됩니다.
-              </p>
-            </div>
-          </div>
-        </button>
-      </div>
-
-      {/* 보조 액션 안내 */}
-      <div className="px-6 mt-6">
-        <p className="text-[11px] text-white/40 font-semibold uppercase tracking-wider">
-          (옛) QR 스캔 결제
-        </p>
-        <p className="text-[11px] text-white/35 mt-1">
-          시연 호환용 — 사용자의 바우처 QR을 직접 스캔하는 옛 방식입니다.
+          사용자의 바우처 QR을 카메라에 비춰주세요
         </p>
       </div>
 

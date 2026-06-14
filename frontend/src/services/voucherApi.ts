@@ -335,64 +335,6 @@ export async function merchantPrepareUse(
 }
 
 // =============================================================================
-// Payment Session (신규 결제 흐름 — 가맹점이 QR 생성 → 사용자가 스캔)
-// =============================================================================
-//
-// 흐름:
-//   1) [가맹점] POST /api/merchant/payment-session { amount }
-//        → PaymentSessionResponse { paymentId, merchantWallet, amount, deadline, status: PENDING }
-//   2) [가맹점] paymentId+merchantWallet+amount+deadline 4개 필드를 QR로 인코딩해 화면에 표시
-//   3) [가맹점] GET /api/merchant/payment-status/{paymentId} 를 2초 간격으로 폴링
-//   4) [사용자] QR 스캔 → 본인 ACTIVE 바우처 선택 → prepareUseVoucher(paymentId 포함) →
-//      EIP-712 서명 → executeUseVoucher
-//   5) [백엔드] executeUseVoucher 성공 시 PaymentSession.status = COMPLETED + txHash 기록
-//   6) [가맹점] 다음 폴링에서 COMPLETED 감지 → "결제 완료!" 화면 전환
-
-export type PaymentSessionStatus =
-  | "PENDING"
-  | "COMPLETED"
-  | "EXPIRED"
-  | "CANCELED";
-
-export interface PaymentSessionResponse {
-  paymentId: string; // UUID 36자
-  merchantWallet: string; // 0x... lowercase
-  amount: number;
-  deadline: number; // epoch seconds (UNIX timestamp)
-  status: PaymentSessionStatus;
-}
-
-export interface PaymentStatusResponse {
-  paymentId: string;
-  status: PaymentSessionStatus;
-  txHash: string | null;
-  completedAt: string | null; // ISO LocalDateTime
-}
-
-export interface CreatePaymentSessionRequest {
-  amount: number;
-}
-
-export async function createPaymentSession(
-  req: CreatePaymentSessionRequest
-): Promise<PaymentSessionResponse> {
-  const res = await axiosApi.post<ApiResponse<PaymentSessionResponse>>(
-    `/api/merchant/payment-session`,
-    req
-  );
-  return res.data.data;
-}
-
-export async function getPaymentStatus(
-  paymentId: string
-): Promise<PaymentStatusResponse> {
-  const res = await axiosApi.get<ApiResponse<PaymentStatusResponse>>(
-    `/api/merchant/payment-status/${paymentId}`
-  );
-  return res.data.data;
-}
-
-// =============================================================================
 // 레거시 호환용 export
 // =============================================================================
 //
