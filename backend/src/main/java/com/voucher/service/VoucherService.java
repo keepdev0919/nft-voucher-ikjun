@@ -372,8 +372,11 @@ public class VoucherService {
     /**
      * 바우처 사용 실행:
      * MetaMask 서명값을 받아 useVoucherByMerchant 온체인 호출 → DB 확정
+     *
+     * NOTE: lazy 필드(voucher.owner 등) 접근을 위해 트랜잭션 안에서 실행.
+     * 컨트랙트 호출/receipt 폴링 시간 동안 트랜잭션을 잡지만, 데모 환경에선 무난.
      */
-    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    @Transactional
     public ApiResponse<VoucherUseHistoryResponse> executeUse(Long voucherId,
                                                               UseVoucherRequest request,
                                                               String ownerWallet) {
