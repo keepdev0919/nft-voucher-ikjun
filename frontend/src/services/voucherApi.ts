@@ -25,7 +25,7 @@ interface ApiResponse<T> {
 export type Role = "USER" | "MERCHANT" | "ADMIN";
 export type ProgramStatus = "ACTIVE" | "PAUSED" | "ENDED";
 export type VoucherStatus = "PENDING" | "ACTIVE" | "USED_UP" | "BURNED";
-export type UseStatus = "PENDING" | "CONFIRMED";
+export type UseStatus = "PENDING" | "CONFIRMED" | "FAILED";
 
 export interface MemberResponse {
   id: number;
@@ -101,6 +101,8 @@ export interface VoucherUseHistoryResponse {
   voucherId: number;
   onChainTokenId: number | null;
   merchantWallet: string;
+  merchantNickname: string;
+  programName: string;
   amount: number;
   oldValue: number;
   newValue: number;
@@ -108,7 +110,8 @@ export interface VoucherUseHistoryResponse {
   txHash: string | null;
   blockNumber: number | null;
   status: UseStatus;
-  usedAt: string;
+  deadline: number;
+  usedAt: string | null;
 }
 
 // =============================================================================
@@ -332,6 +335,23 @@ export async function merchantPrepareUse(
     req
   );
   return res.data.data;
+}
+
+// 가맹점 본인이 받은 결제 내역 — 최신순. JWT 지갑 = 가맹점.
+export async function getMerchantHistory(): Promise<VoucherUseHistoryResponse[]> {
+  const res = await axiosApi.get<ApiResponse<VoucherUseHistoryResponse[]>>(
+    `/api/merchant/history`
+  );
+  return res.data.data;
+}
+
+// 특정 결제 요청의 status만 조회. 가맹점이 prepare 후 사용자 서명 완료
+// 여부를 폴링할 때 사용. 반환값: "PENDING" | "CONFIRMED" | "FAILED".
+export async function getMerchantHistoryStatus(historyId: number): Promise<UseStatus> {
+  const res = await axiosApi.get<ApiResponse<{ status: UseStatus }>>(
+    `/api/merchant/history/${historyId}/status`
+  );
+  return res.data.data.status;
 }
 
 // =============================================================================

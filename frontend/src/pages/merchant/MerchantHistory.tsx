@@ -1,51 +1,47 @@
 import React, { useEffect, useState } from "react";
-import { getVoucherHistory } from "../../services/voucherApi";
-import { useWallet } from "../../context/WalletContext";
+import {
+  getMerchantHistory,
+  UseStatus,
+  VoucherUseHistoryResponse,
+} from "../../services/voucherApi";
 import Toast from "../../components/Toast";
 
-interface UseRecord {
-  tokenId: number;
-  usedAmount: number;
-  usedAt: string;
-  txHash?: string;
+function formatDate(iso: string | null): string {
+  if (!iso) return "-";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return iso;
+  return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
 
-function formatDate(val: string | number): string {
-  if (!val) return "-";
-  // 타임스탬프(초)
-  if (typeof val === "number" || /^\d{10,}/.test(String(val))) {
-    const d = new Date(Number(val) * 1000);
-    return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+function statusBadge(status: UseStatus): { label: string; cls: string } {
+  switch (status) {
+    case "CONFIRMED":
+      return { label: "완료", cls: "bg-green-100 text-green-700" };
+    case "PENDING":
+      return { label: "대기 중", cls: "bg-amber-100 text-amber-700" };
+    case "FAILED":
+      return { label: "실패", cls: "bg-red-100 text-red-700" };
   }
-  return String(val);
 }
 
 export default function MerchantHistory() {
-  const { walletAddress } = useWallet();
-  const [records, setRecords] = useState<UseRecord[]>([]);
+  const [records, setRecords] = useState<VoucherUseHistoryResponse[]>([]);
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!walletAddress) return;
     setLoading(true);
-    getVoucherHistory(walletAddress)
-      .then((res) => {
-        const data = (res.data?.body ?? []).map((item: any) => ({
-          tokenId: Number(item.tokenId),
-          usedAmount: Number(item.usedAmount ?? item.amount ?? 0),
-          usedAt: item.usedAt ?? item.timestamp ?? "",
-          txHash: item.txHash ?? "",
-        }));
-        setRecords(data);
-      })
+    getMerchantHistory()
+      .then(setRecords)
       .catch((err) => {
         setToast(err?.response?.data?.message ?? "사용 내역을 불러오지 못했습니다.");
       })
       .finally(() => setLoading(false));
-  }, [walletAddress]);
+  }, []);
 
-  const totalPending = records.reduce((sum, r) => sum + r.usedAmount, 0);
+  // 완료된 결제만 집계 — PENDING/FAILED는 실제 정산 대상이 아님
+  const confirmedRecords = records.filter((r) => r.status === "CONFIRMED");
+  const totalConfirmed = confirmedRecords.reduce((sum, r) => sum + r.amount, 0);
 
   return (
     <div className="min-h-full">
@@ -61,7 +57,7 @@ export default function MerchantHistory() {
         )}
       </div>
 
-      {/* 정산 대기 금액 카드 */}
+      {/* 완료 결제 합계 카드 */}
       {!loading && records.length > 0 && (
         <div className="px-6 mt-4">
           <div
@@ -72,11 +68,11 @@ export default function MerchantHistory() {
               className="absolute rounded-full pointer-events-none"
               style={{ width: 140, height: 140, top: -30, right: -30, background: "rgba(255,255,255,0.08)" }}
             />
-            <p className="text-xs text-white/70 font-medium">정산 대기 금액</p>
+            <p className="text-xs text-white/70 font-medium">완료된 결제 합계</p>
             <p className="text-[26px] font-bold text-white mt-1 tracking-tight">
-              {totalPending.toLocaleString("ko-KR")}원
+              {totalConfirmed.toLocaleString("ko-KR")}원
             </p>
-            <p className="text-[11px] text-white/65 mt-1">총 {records.length}건</p>
+            <p className="text-[11px] text-white/65 mt-1">총 {confirmedRecords.length}건</p>
           </div>
         </div>
       )}
@@ -94,29 +90,37 @@ export default function MerchantHistory() {
         </div>
       ) : (
         <div className="px-6 mt-4 space-y-2">
-          {records.map((rec, idx) => (
-            <div
-              key={`${rec.tokenId}-${idx}`}
-              className="bg-v-surface rounded-v-lg px-4 py-3.5 shadow-v-sm"
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-semibold text-v-text">
-                    Token #{rec.tokenId}
+          {records.map((rec) => {
+            const badge = statusBadge(rec.status);
+            return (
+              <div
+                key={rec.id}
+                className="bg-v-surface rounded-v-lg px-4 py-3.5 shadow-v-sm"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-semibold text-v-text truncate">
+                        {rec.programName}
+                      </p>
+                      <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${badge.cls}`}>
+                        {badge.label}
+                      </span>
+                    </div>
+                    <p className="text-xs text-v-textMuted mt-0.5">{formatDate(rec.usedAt)}</p>
+                  </div>
+                  <p className="text-base font-bold text-v-accent">
+                    -{rec.amount.toLocaleString("ko-KR")}원
                   </p>
-                  <p className="text-xs text-v-textMuted mt-0.5">{formatDate(rec.usedAt)}</p>
                 </div>
-                <p className="text-base font-bold text-v-accent">
-                  -{rec.usedAmount.toLocaleString("ko-KR")}원
-                </p>
+                {rec.txHash && (
+                  <p className="text-[10px] text-v-textMuted font-mono mt-1.5 truncate">
+                    {rec.txHash}
+                  </p>
+                )}
               </div>
-              {rec.txHash && (
-                <p className="text-[10px] text-v-textMuted font-mono mt-1.5 truncate">
-                  {rec.txHash}
-                </p>
-              )}
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 

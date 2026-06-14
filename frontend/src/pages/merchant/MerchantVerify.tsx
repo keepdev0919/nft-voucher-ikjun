@@ -1,7 +1,9 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
+  getMerchantHistoryStatus,
   merchantPrepareUse,
+  UseStatus,
   UseVoucherPrepareResponse,
   VoucherQrResponse,
 } from "../../services/voucherApi";
@@ -39,7 +41,28 @@ export default function MerchantVerify() {
   const [amountInput, setAmountInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [prepared, setPrepared] = useState<UseVoucherPrepareResponse | null>(null);
+  const [polledStatus, setPolledStatus] = useState<UseStatus>("PENDING");
   const [toast, setToast] = useState<{ msg: string; type: "error" | "success" | "info" } | null>(null);
+
+  // prepared가 생기면 2초마다 백엔드에 status 폴링.
+  // CONFIRMED/FAILED 도달하면 interval 해제 → 분기 렌더링에서 완료/실패 화면 표시.
+  useEffect(() => {
+    if (!prepared) return;
+    if (polledStatus !== "PENDING") return;
+
+    const id = window.setInterval(async () => {
+      try {
+        const status = await getMerchantHistoryStatus(prepared.historyId);
+        if (status !== "PENDING") {
+          setPolledStatus(status);
+        }
+      } catch {
+        // 일시 오류는 무시 — 다음 tick에서 재시도
+      }
+    }, 2000);
+
+    return () => window.clearInterval(id);
+  }, [prepared, polledStatus]);
 
   const showToast = (msg: string, type: "error" | "success" | "info" = "error") => {
     setToast({ msg, type });
@@ -99,6 +122,97 @@ export default function MerchantVerify() {
     }
   };
 
+  // 폴링으로 CONFIRMED 감지 → 결제 완료 화면
+  if (prepared && polledStatus === "CONFIRMED") {
+    return (
+      <div className="min-h-full bg-v-bg flex flex-col">
+        <div className="h-12" />
+
+        <div className="flex-1 flex flex-col items-center justify-center px-6 -mt-8">
+          {/* 체크 아이콘 */}
+          <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center mb-6">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              strokeWidth={2.5}
+              stroke="currentColor"
+              className="w-10 h-10 text-green-600"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+            </svg>
+          </div>
+
+          <h2 className="text-2xl font-bold text-v-text">결제 완료!</h2>
+          <p className="text-sm text-v-textMuted mt-1 max-w-xs text-center">
+            {prepared.programName}
+          </p>
+          <p className="text-3xl font-bold text-v-accent mt-4">
+            {prepared.amount.toLocaleString("ko-KR")}원
+          </p>
+          <p className="text-xs text-v-textMuted font-mono mt-2">
+            요청 번호 #{prepared.historyId}
+          </p>
+        </div>
+
+        <div className="px-6 pb-6 space-y-2">
+          <button
+            onClick={() => navigate("/merchant/home")}
+            className="w-full py-3.5 rounded-v-md bg-v-accent text-white font-semibold text-sm active:bg-v-accentHover transition-colors"
+          >
+            새 결제 받기
+          </button>
+          <button
+            onClick={() => navigate("/merchant/home")}
+            className="w-full py-3 rounded-v-md bg-white/0 text-v-textMuted text-sm border border-v-border"
+          >
+            홈으로
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // 폴링으로 FAILED 감지 → 결제 실패 화면 (만료/거부 등)
+  if (prepared && polledStatus === "FAILED") {
+    return (
+      <div className="min-h-full bg-v-bg flex flex-col">
+        <div className="h-12" />
+
+        <div className="flex-1 flex flex-col items-center justify-center px-6 -mt-8">
+          <div className="w-20 h-20 rounded-full bg-red-100 flex items-center justify-center mb-6">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              strokeWidth={2.5}
+              stroke="currentColor"
+              className="w-10 h-10 text-red-600"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+            </svg>
+          </div>
+
+          <h2 className="text-2xl font-bold text-v-text">결제 실패</h2>
+          <p className="text-sm text-v-textMuted mt-2 max-w-xs text-center leading-relaxed">
+            서명이 만료되었거나 처리 중 오류가 발생했습니다.
+            <br />
+            다시 결제를 받아주세요.
+          </p>
+        </div>
+
+        <div className="px-6 pb-6 space-y-2">
+          <button
+            onClick={() => navigate("/merchant/home")}
+            className="w-full py-3.5 rounded-v-md bg-v-accent text-white font-semibold text-sm active:bg-v-accentHover transition-colors"
+          >
+            새 결제 받기
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   // 결제 요청 완료 → 사용자 서명 대기 화면
   if (prepared) {
     return (
@@ -147,14 +261,6 @@ export default function MerchantVerify() {
             </div>
           </div>
 
-          {/* 안내 */}
-          <div className="mt-6 px-4 py-3 rounded-v-md bg-amber-50 border border-amber-200 max-w-xs">
-            <p className="text-xs text-amber-800 leading-relaxed">
-              ⓘ 결제 완료 알림이 현재 화면에 자동으로 표시되지 않습니다. 결제가
-              완료되면 사용자에게 알림이 가니, 사용자 화면 또는 결제 내역에서
-              확인해주세요.
-            </p>
-          </div>
         </div>
 
         <div className="px-6 pb-6 space-y-2">
