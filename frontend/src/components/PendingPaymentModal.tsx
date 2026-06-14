@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useMemo } from "react";
+import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import {
   UseVoucherPrepareResponse,
   executeUseVoucher,
@@ -92,6 +92,15 @@ export default function PendingPaymentModal({
       setPhase("idle");
     }
   }, [request, walletAddress, onSuccess]);
+
+  // 모달이 뜨면 메타마스크 서명창을 자동으로 호출. 사용자가 거부/에러로 떨어지면
+  // 모달의 "서명하고 결제" 버튼으로 다시 시도 가능. 동일 request에 대해 자동 호출은 1회만.
+  const autoTriggeredRef = useRef(false);
+  useEffect(() => {
+    if (autoTriggeredRef.current) return;
+    autoTriggeredRef.current = true;
+    handleSignAndPay();
+  }, [handleSignAndPay]);
 
   return (
     <div
