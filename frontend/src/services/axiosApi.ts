@@ -1,9 +1,11 @@
 import axios, { AxiosError, AxiosRequestConfig, InternalAxiosRequestConfig } from "axios";
 import { clearToken, clearWallet, loadToken } from "./auth/tokenStorage";
 
-// 팀 백엔드 신규 베이스 URL — /api 프리픽스는 각 호출에서 명시한다.
+// 백엔드 베이스 URL을 상대 경로로 둠.
+// CRA dev 서버가 package.json "proxy" 설정으로 /api/* → http://localhost:8080 으로 포워딩.
+// 같은 origin으로 보여서 CORS 우회되고, dev/prod 양쪽 일관됨.
 const axiosApi = axios.create({
-  baseURL: `http://${window.location.hostname}:8080`,
+  baseURL: "",
   timeout: 10000,
 });
 
