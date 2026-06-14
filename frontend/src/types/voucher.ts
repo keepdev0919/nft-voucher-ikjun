@@ -15,7 +15,7 @@ export interface Voucher {
 
 // =============================================================================
 // 백엔드 program.category(문자열) → 이모지 매핑
-// VoucherResponse.programCategory 등에서 공용 사용.
+// VoucherResponse.programCategory / VoucherQrResponse.category 양쪽에서 공용 사용.
 // =============================================================================
 
 export const CATEGORY_ICONS: Record<string, string> = {
