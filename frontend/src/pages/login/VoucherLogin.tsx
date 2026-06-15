@@ -13,7 +13,7 @@ import { signLoginMessage } from "../../services/web3/signLoginMessage";
 import { ensureGanacheNetwork } from "../../services/web3/network";
 import Toast from "../../components/Toast";
 
-type Step = "connect" | "nickname" | "role" | "category" | "signing";
+type Step = "connect" | "nickname" | "extraInfo" | "role" | "category" | "signing";
 
 const CATEGORY_OPTIONS = [
   { key: "일반 음식점", label: "일반 음식점", icon: "🍽️" },
@@ -70,6 +70,9 @@ export default function VoucherLogin() {
   const [localWallet, setLocalWallet] = useState<string>("");
   const [step, setStep] = useState<Step>("connect");
   const [nicknameInput, setNicknameInput] = useState("");
+  const [nameInput, setNameInput] = useState("");
+  const [birthDateInput, setBirthDateInput] = useState(""); // "YYYY-MM-DD"
+  const [regionInput, setRegionInput] = useState("");
   const [pendingRole, setPendingRole] = useState<"user" | "merchant" | null>(null);
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState<{ msg: string; type: "error" | "success" | "info" } | null>(null);
@@ -182,6 +185,23 @@ export default function VoucherLogin() {
       return;
     }
     // 닉네임만 잠시 보관 — 실제 등록은 역할 선택 후 수행 (USER/MERCHANT 엔드포인트가 다름)
+    // 추가 정보(이름/생년월일/지역)는 사용자(USER) 자격 매칭에 쓰이므로 먼저 받는다.
+    setStep("extraInfo");
+  };
+
+  const handleExtraInfoSubmit = () => {
+    if (!nameInput.trim()) {
+      showToast("이름을 입력해주세요.");
+      return;
+    }
+    if (!birthDateInput) {
+      showToast("생년월일을 입력해주세요.");
+      return;
+    }
+    if (!regionInput.trim()) {
+      showToast("지역을 입력해주세요.");
+      return;
+    }
     setStep("role");
   };
 
@@ -189,6 +209,12 @@ export default function VoucherLogin() {
     setPendingRole(selected);
     if (selected === "merchant") {
       setStep("category");
+      return;
+    }
+    // USER — 추가 정보(이름/생년월일/지역)가 비어있으면 extraInfo로 돌려보낸다.
+    if (!nameInput.trim() || !birthDateInput || !regionInput.trim()) {
+      showToast("추가 정보를 먼저 입력해주세요.");
+      setStep("extraInfo");
       return;
     }
     // USER — 즉시 등록 후 서명
@@ -236,6 +262,9 @@ export default function VoucherLogin() {
         await registerUser({
           walletAddress: localWallet,
           nickname: nick,
+          name: nameInput.trim(),
+          birthDate: birthDateInput, // 이미 "YYYY-MM-DD" 형식
+          region: regionInput.trim(),
         });
       }
       setNickname(nick);
@@ -324,6 +353,58 @@ export default function VoucherLogin() {
             <button
               onClick={handleNicknameSubmit}
               disabled={loading || !nicknameInput.trim()}
+              className="w-full py-4 rounded-v-lg bg-v-accent text-white font-semibold text-[15px] shadow-v-md active:bg-v-accentHover transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
+            >
+              {loading ? (
+                <span className="w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+              ) : "다음"}
+            </button>
+          </div>
+        )}
+
+        {/* Step 2.5: 추가 정보 입력 (USER 자격 매칭용) */}
+        {step === "extraInfo" && (
+          <div className="space-y-4">
+            <div className="text-center mb-2">
+              <p className="text-v-text font-semibold">추가 정보를 입력해주세요</p>
+              <p className="text-xs text-v-textMuted mt-1">바우처 자격 매칭에 사용됩니다</p>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs text-v-textMuted mb-1.5">이름</label>
+                <input
+                  type="text"
+                  value={nameInput}
+                  onChange={(e) => setNameInput(e.target.value)}
+                  placeholder="실명 입력"
+                  maxLength={30}
+                  className="w-full px-4 py-3 rounded-v-md border border-v-border bg-v-surface text-v-text text-sm outline-none focus:border-v-accent transition-colors"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-v-textMuted mb-1.5">생년월일</label>
+                <input
+                  type="date"
+                  value={birthDateInput}
+                  onChange={(e) => setBirthDateInput(e.target.value)}
+                  className="w-full px-4 py-3 rounded-v-md border border-v-border bg-v-surface text-v-text text-sm outline-none focus:border-v-accent transition-colors"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-v-textMuted mb-1.5">지역</label>
+                <input
+                  type="text"
+                  value={regionInput}
+                  onChange={(e) => setRegionInput(e.target.value)}
+                  placeholder="예: 서울"
+                  maxLength={20}
+                  className="w-full px-4 py-3 rounded-v-md border border-v-border bg-v-surface text-v-text text-sm outline-none focus:border-v-accent transition-colors"
+                />
+              </div>
+            </div>
+            <button
+              onClick={handleExtraInfoSubmit}
+              disabled={loading || !nameInput.trim() || !birthDateInput || !regionInput.trim()}
               className="w-full py-4 rounded-v-lg bg-v-accent text-white font-semibold text-[15px] shadow-v-md active:bg-v-accentHover transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
             >
               {loading ? (

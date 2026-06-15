@@ -1,86 +1,129 @@
-import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useEffect, useState } from "react";
 import Toast from "../../components/Toast";
-import { addMockVoucher } from "../../services/mockVoucherStore";
-import { Voucher } from "../../types/voucher";
+import {
+  getActivePrograms,
+  applyVoucher,
+  VoucherProgramResponse,
+} from "../../services/voucherApi";
+import { useWallet } from "../../context/WalletContext";
+import {
+  getCategoryIcon,
+  expiryBadge,
+  EXPIRY_TONE_STYLE,
+} from "../../types/voucher";
 
-interface Program {
-  id: number;
-  name: string;
-  amount: number;
-  totalSupply: number;
-  remaining: number;
-  expiryDate: string;
-  category: string;
-  issuer: string;
+type ToastState = { message: string; type: "success" | "error" | "info" } | null;
+
+/** "YYYY.MM.DD" 포맷 */
+function formatDate(iso: string | null | undefined): string {
+  if (!iso) return "-";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "-";
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}.${m}.${day}`;
 }
 
-const MOCK_PROGRAMS: Program[] = [
-  {
-    id: 1,
-    name: "청년 식비 지원",
-    amount: 50000,
-    totalSupply: 100,
-    remaining: 73,
-    expiryDate: "2026-08-31",
-    category: "일반 음식점",
-    issuer: "서울시 청년지원센터",
-  },
-  {
-    id: 2,
-    name: "문화생활 바우처",
-    amount: 30000,
-    totalSupply: 50,
-    remaining: 12,
-    expiryDate: "2026-07-15",
-    category: "영화관",
-    issuer: "문화체육관광부",
-  },
-  {
-    id: 3,
-    name: "지역 음식점 할인권",
-    amount: 20000,
-    totalSupply: 200,
-    remaining: 156,
-    expiryDate: "2026-09-30",
-    category: "일반 음식점",
-    issuer: "강남구청",
-  },
-];
+/** 자격 요건 한 줄 표시용 */
+function buildEligibility(program: VoucherProgramResponse): {
+  ageLabel: string | null;
+  regionLabel: string | null;
+  isOpen: boolean;
+} {
+  const { minAge, maxAge, allowedRegions } = program;
 
-const CATEGORY_ICON: Record<string, string> = {
-  "일반 음식점": "🍽️",
-  "영화관": "🎬",
-};
+  let ageLabel: string | null = null;
+  if (minAge != null && maxAge != null) {
+    ageLabel = `만 ${minAge}~${maxAge}세`;
+  } else if (minAge != null) {
+    ageLabel = `만 ${minAge}세 이상`;
+  } else if (maxAge != null) {
+    ageLabel = `만 ${maxAge}세 이하`;
+  }
 
-const CATEGORY_TO_TYPE: Record<string, Voucher["category"]> = {
-  "일반 음식점": "food",
-  "영화관": "other",
-};
+  const trimmedRegions = allowedRegions?.trim();
+  const regionLabel = trimmedRegions
+    ? `지역: ${trimmedRegions
+        .split(",")
+        .map((r) => r.trim())
+        .filter(Boolean)
+        .join(", ")}`
+    : null;
+
+  return {
+    ageLabel,
+    regionLabel,
+    isOpen: !ageLabel && !regionLabel,
+  };
+}
 
 export default function VoucherProgramList() {
-  const navigate = useNavigate();
+  const { walletAddress } = useWallet();
+
+  const [programs, setPrograms] = useState<VoucherProgramResponse[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
   const [applied, setApplied] = useState<Set<number>>(new Set());
-  const [toast, setToast] = useState<string | null>(null);
+  const [applyingId, setApplyingId] = useState<number | null>(null);
+  const [toast, setToast] = useState<ToastState>(null);
 
-  const handleApply = (program: Program) => {
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      setLoadError(null);
+      try {
+        const list = await getActivePrograms();
+        if (!cancelled) setPrograms(list);
+      } catch (e: any) {
+        if (!cancelled) {
+          setLoadError(
+            e?.response?.data?.message ??
+              "바우처 목록을 불러오지 못했어요. 잠시 후 다시 시도해주세요."
+          );
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleApply = async (program: VoucherProgramResponse) => {
     if (applied.has(program.id)) return;
-    setApplied((prev) => new Set(prev).add(program.id));
+    if (applyingId != null) return;
+    if (!walletAddress) {
+      setToast({ message: "지갑 연결이 필요해요.", type: "error" });
+      return;
+    }
 
-    addMockVoucher({
-      tokenId: Date.now(),
-      name: program.name,
-      category: CATEGORY_TO_TYPE[program.category] ?? "other",
-      amount: program.amount,
-      remainingAmount: program.amount,
-      status: "active",
-      expiresAt: program.expiryDate,
-      issuedBy: program.issuer,
-      allowedCategories: [program.category],
-      tokenAddress: "",
-    });
-
-    setToast(`"${program.name}" 신청 완료! 내 바우처에서 확인하세요.`);
+    setApplyingId(program.id);
+    try {
+      await applyVoucher({
+        voucherProgramId: program.id,
+        walletAddress,
+      });
+      setApplied((prev) => {
+        const next = new Set(prev);
+        next.add(program.id);
+        return next;
+      });
+      setToast({
+        message: "신청 완료! 내 바우처에서 확인하세요.",
+        type: "success",
+      });
+    } catch (e: any) {
+      const msg =
+        e?.response?.data?.message ??
+        "신청에 실패했어요. 잠시 후 다시 시도해주세요.";
+      setToast({ message: msg, type: "error" });
+    } finally {
+      setApplyingId(null);
+    }
   };
 
   return (
@@ -89,77 +132,139 @@ export default function VoucherProgramList() {
 
       {/* 헤더 */}
       <div className="px-6">
-        <h1 className="text-[20px] font-bold text-v-text">바우처 프로그램</h1>
-        <p className="text-xs text-v-textMuted mt-0.5">신청 가능한 바우처 목록입니다</p>
+        <h1 className="text-[20px] font-bold text-v-text">바우처 둘러보기</h1>
+        <p className="text-xs text-v-textMuted mt-0.5">
+          {loading
+            ? "불러오는 중…"
+            : `신청 가능한 바우처 ${programs.length}개`}
+        </p>
       </div>
 
-      {/* 목록 */}
-      <div className="px-6 mt-4 space-y-3">
-        {MOCK_PROGRAMS.map((program) => {
-          const isApplied = applied.has(program.id);
-          const usageRate = Math.round(((program.totalSupply - program.remaining) / program.totalSupply) * 100);
+      {/* 본문 */}
+      <div className="px-6 mt-4">
+        {loading && (
+          <div className="flex justify-center py-16">
+            <div className="w-7 h-7 rounded-full border-2 border-v-surface2 border-t-v-accent animate-spin" />
+          </div>
+        )}
 
-          return (
-            <div
-              key={program.id}
-              className="bg-v-surface rounded-v-lg px-4 py-4 shadow-v-sm"
-            >
-              {/* 상단: 카테고리 + 발급기관 */}
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-v-surface2 text-v-textMuted">
-                  {CATEGORY_ICON[program.category]} {program.category}
-                </span>
-                <span className="text-[10px] text-v-textMuted">{program.issuer}</span>
-              </div>
+        {!loading && loadError && (
+          <div className="bg-v-surface rounded-v-lg px-4 py-6 text-center text-sm text-v-error">
+            {loadError}
+          </div>
+        )}
 
-              {/* 프로그램 이름 */}
-              <p className="text-base font-bold text-v-text">{program.name}</p>
+        {!loading && !loadError && programs.length === 0 && (
+          <div className="bg-v-surface rounded-v-lg px-4 py-10 text-center text-sm text-v-textMuted">
+            현재 신청 가능한 바우처가 없습니다.
+          </div>
+        )}
 
-              {/* 금액 */}
-              <p className="text-[22px] font-bold text-v-accent mt-1">
-                {program.amount.toLocaleString("ko-KR")}원
-              </p>
+        {!loading && !loadError && programs.length > 0 && (
+          <div className="space-y-3">
+            {programs.map((program) => {
+              const isApplied = applied.has(program.id);
+              const isApplying = applyingId === program.id;
+              const badge = expiryBadge(program.validUntil);
+              const { ageLabel, regionLabel, isOpen } = buildEligibility(program);
 
-              {/* 유효기간 */}
-              <p className="text-xs text-v-textMuted mt-1">
-                유효기간 ~{program.expiryDate}
-              </p>
+              return (
+                <div
+                  key={program.id}
+                  className="bg-v-surface rounded-v-lg px-4 py-4 shadow-v-sm"
+                >
+                  {/* 상단: 카테고리 + 만료 뱃지 */}
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-v-surface2 text-v-textMuted">
+                      {getCategoryIcon(program.category)} {program.category}
+                    </span>
+                    <span
+                      className={`text-[10px] px-2 py-0.5 rounded-full ${EXPIRY_TONE_STYLE[badge.tone]}`}
+                    >
+                      {badge.tone === "ok" && badge.days == null
+                        ? "기한 없음"
+                        : badge.label}
+                    </span>
+                  </div>
 
-              {/* 잔여 수량 바 */}
-              <div className="mt-3">
-                <div className="flex justify-between text-[10px] text-v-textMuted mb-1">
-                  <span>잔여 수량</span>
-                  <span>{program.remaining} / {program.totalSupply}</span>
+                  {/* 프로그램 이름 */}
+                  <p className="text-base font-bold text-v-text">
+                    {program.name}
+                  </p>
+
+                  {/* 설명 */}
+                  {program.description && (
+                    <p className="text-xs text-v-textMuted mt-1 leading-relaxed">
+                      {program.description}
+                    </p>
+                  )}
+
+                  {/* 금액 */}
+                  <p className="text-[22px] font-bold text-v-accent mt-2">
+                    {program.maxValue.toLocaleString("ko-KR")}원
+                  </p>
+
+                  {/* 유효기간 */}
+                  <p className="text-xs text-v-textMuted mt-1">
+                    {formatDate(program.validUntil)}까지
+                  </p>
+
+                  {/* 자격 요건 */}
+                  <div className="mt-3 space-y-1">
+                    {isOpen ? (
+                      <p className="text-[11px] text-v-textMuted">
+                        누구나 신청 가능
+                      </p>
+                    ) : (
+                      <>
+                        {ageLabel && (
+                          <p className="text-[11px] text-v-textMuted">
+                            대상 연령: {ageLabel}
+                          </p>
+                        )}
+                        {regionLabel && (
+                          <p className="text-[11px] text-v-textMuted">
+                            {regionLabel}
+                          </p>
+                        )}
+                      </>
+                    )}
+                  </div>
+
+                  {/* 신청 버튼 */}
+                  <button
+                    onClick={() => handleApply(program)}
+                    disabled={isApplied || isApplying}
+                    className={`w-full mt-3 py-3 rounded-v-md text-sm font-semibold transition-colors flex items-center justify-center gap-2 ${
+                      isApplied
+                        ? "bg-v-surface2 text-v-textMuted cursor-default"
+                        : isApplying
+                        ? "bg-v-accent/70 text-white cursor-wait"
+                        : "bg-v-accent text-white active:bg-v-accentHover"
+                    }`}
+                  >
+                    {isApplying && (
+                      <span className="w-4 h-4 rounded-full border-2 border-white/40 border-t-white animate-spin" />
+                    )}
+                    {isApplied
+                      ? "신청 완료"
+                      : isApplying
+                      ? "신청 중…"
+                      : "신청하기"}
+                  </button>
                 </div>
-                <div className="h-1.5 rounded-full bg-v-surface2 overflow-hidden">
-                  <div
-                    className="h-full rounded-full bg-v-accent"
-                    style={{ width: `${100 - usageRate}%` }}
-                  />
-                </div>
-              </div>
-
-              {/* 신청 버튼 */}
-              <button
-                onClick={() => handleApply(program)}
-                disabled={isApplied || program.remaining === 0}
-                className={`w-full mt-3 py-3 rounded-v-md text-sm font-semibold transition-colors ${
-                  isApplied
-                    ? "bg-v-surface2 text-v-textMuted cursor-default"
-                    : program.remaining === 0
-                    ? "bg-v-surface2 text-v-textMuted cursor-default"
-                    : "bg-v-accent text-white active:bg-v-accentHover"
-                }`}
-              >
-                {isApplied ? "신청 완료" : program.remaining === 0 ? "마감" : "신청하기"}
-              </button>
-            </div>
-          );
-        })}
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {toast && (
-        <Toast message={toast} type="success" onClose={() => setToast(null)} />
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
       )}
     </div>
   );

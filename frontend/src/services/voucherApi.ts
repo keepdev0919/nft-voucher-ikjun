@@ -31,6 +31,9 @@ export interface MemberResponse {
   id: number;
   walletAddress: string;
   nickname: string;
+  name: string | null;
+  birthDate: string | null; // ISO date "YYYY-MM-DD"
+  region: string | null;
   role: Role;
   category: string | null;
   createdAt: string; // LocalDateTime → ISO string
@@ -48,6 +51,12 @@ export interface VoucherProgramResponse {
   validFrom: string;
   validUntil: string;
   status: ProgramStatus;
+  minAge: number | null;
+  maxAge: number | null;
+  allowedRegions: string | null; // 콤마 구분, 예: "서울,경기"
+  usageGuide: string | null;
+  issuanceGuide: string | null;
+  refundPolicy: string | null;
   createdAt: string;
 }
 
@@ -121,6 +130,14 @@ export interface VoucherUseHistoryResponse {
 export interface CreateUserRequestDto {
   walletAddress: string;
   nickname: string;
+  name: string;
+  birthDate: string; // ISO date "YYYY-MM-DD"
+  region: string;
+}
+
+export interface ApplyVoucherRequestDto {
+  voucherProgramId: number;
+  walletAddress: string;
 }
 
 export interface CreateMerchantRequestDto {
@@ -138,6 +155,12 @@ export interface CreateVoucherProgramRequest {
   category: string;
   validFrom: string; // ISO 8601
   validUntil: string;
+  minAge?: number;
+  maxAge?: number;
+  allowedRegions?: string; // 콤마 구분, 예: "서울,경기"
+  usageGuide?: string;
+  issuanceGuide?: string;
+  refundPolicy?: string;
 }
 
 export interface CreateVoucherRequestDto {
@@ -184,6 +207,18 @@ export async function registerUser(
 ): Promise<MemberResponse> {
   const res = await axiosApi.post<ApiResponse<MemberResponse>>(
     `/api/members/user`,
+    req
+  );
+  return res.data.data;
+}
+
+// 자격 기반 자동 신청 — 백엔드가 회원의 birthDate/region을 프로그램의
+// minAge/maxAge/allowedRegions와 비교해 통과 시 자동 민팅, 미달 시 거부.
+export async function applyVoucher(
+  req: ApplyVoucherRequestDto
+): Promise<VoucherResponse> {
+  const res = await axiosApi.post<ApiResponse<VoucherResponse>>(
+    `/api/vouchers/apply`,
     req
   );
   return res.data.data;

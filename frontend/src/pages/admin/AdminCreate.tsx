@@ -26,6 +26,12 @@ export default function AdminCreate() {
     category: "일반 음식점",
     validFrom: "",
     validUntil: "",
+    minAge: "",
+    maxAge: "",
+    allowedRegions: "",
+    usageGuide: "",
+    issuanceGuide: "",
+    refundPolicy: "",
   });
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState<{ msg: string; type: "error" | "success" | "info" } | null>(null);
@@ -75,6 +81,12 @@ export default function AdminCreate() {
         category: form.category,
         validFrom: validFromIso,
         validUntil: validUntilIso,
+        minAge: form.minAge ? Number(form.minAge) : undefined,
+        maxAge: form.maxAge ? Number(form.maxAge) : undefined,
+        allowedRegions: form.allowedRegions.trim() || undefined,
+        usageGuide: form.usageGuide.trim() || undefined,
+        issuanceGuide: form.issuanceGuide.trim() || undefined,
+        refundPolicy: form.refundPolicy.trim() || undefined,
       });
 
       showToast(`프로그램 #${res.id} "${res.name}" 생성 완료!`, "success");
@@ -179,6 +191,96 @@ export default function AdminCreate() {
             value={form.validUntil}
             onChange={handleChange("validUntil")}
             className="w-full px-4 py-3 rounded-v-md border border-v-border bg-v-surface text-v-text text-sm outline-none focus:border-v-accent transition-colors"
+          />
+        </div>
+
+        {/* 자격 요건 섹션 */}
+        <div className="pt-4 mt-2 border-t border-v-border">
+          <h2 className="text-sm font-semibold text-v-text">자격 요건 <span className="text-v-textMuted font-normal">(선택)</span></h2>
+          <p className="text-xs text-v-textMuted mt-1">비워두면 누구나 신청 가능합니다.</p>
+        </div>
+
+        <div>
+          <label className="text-sm font-semibold text-v-text block mb-1.5">
+            최소 나이 <span className="text-v-textMuted font-normal">(선택)</span>
+          </label>
+          <input
+            type="number"
+            value={form.minAge}
+            onChange={handleChange("minAge")}
+            placeholder="예: 19"
+            className="w-full px-4 py-3 rounded-v-md border border-v-border bg-v-surface text-v-text text-sm outline-none focus:border-v-accent transition-colors"
+          />
+        </div>
+
+        <div>
+          <label className="text-sm font-semibold text-v-text block mb-1.5">
+            최대 나이 <span className="text-v-textMuted font-normal">(선택)</span>
+          </label>
+          <input
+            type="number"
+            value={form.maxAge}
+            onChange={handleChange("maxAge")}
+            placeholder="예: 34"
+            className="w-full px-4 py-3 rounded-v-md border border-v-border bg-v-surface text-v-text text-sm outline-none focus:border-v-accent transition-colors"
+          />
+        </div>
+
+        <div>
+          <label className="text-sm font-semibold text-v-text block mb-1.5">
+            허용 지역 <span className="text-v-textMuted font-normal">(선택, 콤마로 구분)</span>
+          </label>
+          <input
+            type="text"
+            value={form.allowedRegions}
+            onChange={handleChange("allowedRegions")}
+            placeholder="예: 서울,경기,인천"
+            className="w-full px-4 py-3 rounded-v-md border border-v-border bg-v-surface text-v-text text-sm outline-none focus:border-v-accent transition-colors"
+          />
+        </div>
+
+        {/* 안내 문구 섹션 */}
+        <div className="pt-4 mt-2 border-t border-v-border">
+          <h2 className="text-sm font-semibold text-v-text">안내 문구 <span className="text-v-textMuted font-normal">(선택)</span></h2>
+          <p className="text-xs text-v-textMuted mt-1">사용자에게 표시될 안내 문구입니다.</p>
+        </div>
+
+        <div>
+          <label className="text-sm font-semibold text-v-text block mb-1.5">
+            사용 안내 <span className="text-v-textMuted font-normal">(선택)</span>
+          </label>
+          <textarea
+            value={form.usageGuide}
+            onChange={handleChange("usageGuide")}
+            placeholder="바우처 사용 시 표시될 안내"
+            rows={4}
+            className="w-full px-4 py-3 rounded-v-md border border-v-border bg-v-surface text-v-text text-sm outline-none focus:border-v-accent transition-colors resize-none"
+          />
+        </div>
+
+        <div>
+          <label className="text-sm font-semibold text-v-text block mb-1.5">
+            발급 안내 <span className="text-v-textMuted font-normal">(선택)</span>
+          </label>
+          <textarea
+            value={form.issuanceGuide}
+            onChange={handleChange("issuanceGuide")}
+            placeholder="신청/발급 시 안내"
+            rows={4}
+            className="w-full px-4 py-3 rounded-v-md border border-v-border bg-v-surface text-v-text text-sm outline-none focus:border-v-accent transition-colors resize-none"
+          />
+        </div>
+
+        <div>
+          <label className="text-sm font-semibold text-v-text block mb-1.5">
+            환불 정책 <span className="text-v-textMuted font-normal">(선택)</span>
+          </label>
+          <textarea
+            value={form.refundPolicy}
+            onChange={handleChange("refundPolicy")}
+            placeholder="환불 관련 정책"
+            rows={4}
+            className="w-full px-4 py-3 rounded-v-md border border-v-border bg-v-surface text-v-text text-sm outline-none focus:border-v-accent transition-colors resize-none"
           />
         </div>
 
