@@ -21,7 +21,6 @@ export default function AdminCreate() {
 
   const [form, setForm] = useState({
     name: "",
-    description: "",
     maxValue: "",
     totalSupply: "",
     category: "일반 음식점",
@@ -30,9 +29,6 @@ export default function AdminCreate() {
     minAge: "",
     maxAge: "",
     allowedRegions: "",
-    usageGuide: "",
-    issuanceGuide: "",
-    refundPolicy: "",
   });
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState<{ msg: string; type: "error" | "success" | "info" } | null>(null);
@@ -76,7 +72,6 @@ export default function AdminCreate() {
       const res = await createVoucherProgram({
         walletAddress,
         name: form.name,
-        description: form.description || undefined,
         maxValue,
         totalSupply,
         category: form.category,
@@ -85,9 +80,6 @@ export default function AdminCreate() {
         minAge: form.minAge ? Number(form.minAge) : undefined,
         maxAge: form.maxAge ? Number(form.maxAge) : undefined,
         allowedRegions: form.allowedRegions.trim() || undefined,
-        usageGuide: form.usageGuide.trim() || undefined,
-        issuanceGuide: form.issuanceGuide.trim() || undefined,
-        refundPolicy: form.refundPolicy.trim() || undefined,
       });
 
       showToast(`프로그램 #${res.id} "${res.name}" 생성 완료!`, "success");
@@ -124,19 +116,6 @@ export default function AdminCreate() {
             onChange={handleChange("name")}
             placeholder="예: 청년 식비 지원 바우처"
             className="w-full px-4 py-3 rounded-v-md border border-v-border bg-v-surface text-v-text text-sm outline-none focus:border-v-accent transition-colors"
-          />
-        </div>
-
-        <div>
-          <label className="text-sm font-semibold text-v-text block mb-1.5">
-            설명 <span className="text-v-textMuted font-normal">(선택)</span>
-          </label>
-          <textarea
-            value={form.description}
-            onChange={handleChange("description")}
-            placeholder="프로그램에 대한 간단한 설명"
-            rows={2}
-            className="w-full px-4 py-3 rounded-v-md border border-v-border bg-v-surface text-v-text text-sm outline-none focus:border-v-accent transition-colors resize-none"
           />
         </div>
 
@@ -266,51 +245,6 @@ export default function AdminCreate() {
           <p className="text-[11px] text-v-textMuted mt-2">
             아무것도 선택하지 않으면 모든 지역에서 신청 가능합니다.
           </p>
-        </div>
-
-        {/* 안내 문구 섹션 */}
-        <div className="pt-4 mt-2 border-t border-v-border">
-          <h2 className="text-sm font-semibold text-v-text">안내 문구 <span className="text-v-textMuted font-normal">(선택)</span></h2>
-          <p className="text-xs text-v-textMuted mt-1">사용자에게 표시될 안내 문구입니다.</p>
-        </div>
-
-        <div>
-          <label className="text-sm font-semibold text-v-text block mb-1.5">
-            사용 안내 <span className="text-v-textMuted font-normal">(선택)</span>
-          </label>
-          <textarea
-            value={form.usageGuide}
-            onChange={handleChange("usageGuide")}
-            placeholder="바우처 사용 시 표시될 안내"
-            rows={4}
-            className="w-full px-4 py-3 rounded-v-md border border-v-border bg-v-surface text-v-text text-sm outline-none focus:border-v-accent transition-colors resize-none"
-          />
-        </div>
-
-        <div>
-          <label className="text-sm font-semibold text-v-text block mb-1.5">
-            발급 안내 <span className="text-v-textMuted font-normal">(선택)</span>
-          </label>
-          <textarea
-            value={form.issuanceGuide}
-            onChange={handleChange("issuanceGuide")}
-            placeholder="신청/발급 시 안내"
-            rows={4}
-            className="w-full px-4 py-3 rounded-v-md border border-v-border bg-v-surface text-v-text text-sm outline-none focus:border-v-accent transition-colors resize-none"
-          />
-        </div>
-
-        <div>
-          <label className="text-sm font-semibold text-v-text block mb-1.5">
-            환불 정책 <span className="text-v-textMuted font-normal">(선택)</span>
-          </label>
-          <textarea
-            value={form.refundPolicy}
-            onChange={handleChange("refundPolicy")}
-            placeholder="환불 관련 정책"
-            rows={4}
-            className="w-full px-4 py-3 rounded-v-md border border-v-border bg-v-surface text-v-text text-sm outline-none focus:border-v-accent transition-colors resize-none"
-          />
         </div>
 
         <button
