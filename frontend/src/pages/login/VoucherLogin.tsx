@@ -12,6 +12,7 @@ import { getNonce, verifyLogin } from "../../services/auth/authApi";
 import { signLoginMessage } from "../../services/web3/signLoginMessage";
 import { ensureGanacheNetwork } from "../../services/web3/network";
 import Toast from "../../components/Toast";
+import { KOREA_REGIONS } from "../../types/regions";
 
 type Step = "connect" | "nickname" | "extraInfo" | "role" | "category" | "signing";
 
@@ -392,14 +393,16 @@ export default function VoucherLogin() {
               </div>
               <div>
                 <label className="block text-xs text-v-textMuted mb-1.5">지역</label>
-                <input
-                  type="text"
+                <select
                   value={regionInput}
                   onChange={(e) => setRegionInput(e.target.value)}
-                  placeholder="예: 서울"
-                  maxLength={20}
                   className="w-full px-4 py-3 rounded-v-md border border-v-border bg-v-surface text-v-text text-sm outline-none focus:border-v-accent transition-colors"
-                />
+                >
+                  <option value="">지역을 선택해주세요</option>
+                  {KOREA_REGIONS.map((r) => (
+                    <option key={r} value={r}>{r}</option>
+                  ))}
+                </select>
               </div>
             </div>
             <button
