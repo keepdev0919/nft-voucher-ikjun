@@ -1,0 +1,1365 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+  <meta charset="UTF-8">
+  <title>블록체인 기반 NFT 바우처 시스템 - 최종 발표</title>
+  <style>
+    @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+    @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;700&family=Outfit:wght@400;600;800&display=swap');
+
+    /* ============================================================
+     THEME SYSTEM (CSS VARIABLES)
+     ============================================================ */
+    :root {
+      /* Clean Light Theme (A) */
+      --bg: #f3f4f6;
+      --bg-slide: #ffffff;
+      --text: #111827;
+      --text-dim: #4b5563;
+      --text-mute: #9ca3af;
+      --accent: #2563eb;
+      --accent-dark: #1d4ed8;
+      --accent-soft: rgba(37, 99, 235, 0.05);
+      --accent-line: rgba(37, 99, 235, 0.15);
+      --border: #e5e7eb;
+      --shadow-card: 0 12px 30px rgba(0, 0, 0, 0.05);
+      --success: #10b981;
+      --success-soft: rgba(16, 185, 129, 0.05);
+      --danger: #ef4444;
+      --danger-soft: rgba(239, 68, 68, 0.05);
+      --font-sans: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+      --font-mono: 'Fira Code', monospace;
+      --font-outfit: 'Outfit', sans-serif;
+    }
+
+    /* ============================================================
+     GLOBAL STYLES & CONTROLS
+     ============================================================ */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html,
+    body {
+      font-family: var(--font-sans);
+      background: var(--bg);
+      color: var(--text);
+      -webkit-font-smoothing: antialiased;
+      transition: background 0.3s ease, color 0.3s ease;
+    }
+
+
+
+    /* ============================================================
+     SLIDE CONTAINER LAYOUT
+     ============================================================ */
+    .slide {
+      width: 1280px;
+      height: 720px;
+      background: var(--bg-slide);
+      margin: 40px auto;
+      padding: 56px 64px;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+      border-radius: 20px;
+      border: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      page-break-after: always;
+      break-after: page;
+      transition: background 0.3s ease, border-color 0.3s ease;
+    }
+
+    /* Header styling across slides */
+    .slide-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 28px;
+      flex-shrink: 0;
+    }
+
+    .slide-header .title-rail {
+      width: 4px;
+      height: 38px;
+      background: var(--accent);
+      border-radius: 2px;
+      display: inline-block;
+      margin-right: 14px;
+    }
+
+    .slide-header .left {
+      display: flex;
+      align-items: center;
+    }
+
+    .slide-header .title-block {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .slide-header .eyebrow {
+      font-family: var(--font-outfit);
+      font-size: 12px;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    .slide-header .section-title {
+      font-size: 32px;
+      font-weight: 800;
+      color: var(--text);
+      letter-spacing: -0.02em;
+      margin-top: 2px;
+    }
+
+    .slide-header .num-large {
+      font-family: var(--font-outfit);
+      font-size: 26px;
+      font-weight: 800;
+      color: var(--accent);
+      opacity: 0.8;
+    }
+
+    /* Footer styling */
+    .brand-mark {
+      position: absolute;
+      bottom: 24px;
+      left: 64px;
+      font-family: var(--font-outfit);
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-mute);
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+    }
+
+    .page-num {
+      position: absolute;
+      bottom: 24px;
+      right: 64px;
+      font-family: var(--font-outfit);
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-mute);
+    }
+
+    /* ============================================================
+     GRID & CARD LAYOUT SYSTEMS
+     ============================================================ */
+    .grid-2x1 {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 28px;
+      flex: 1;
+      min-height: 0;
+    }
+
+    .grid-3x1 {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+      flex: 1;
+      min-height: 0;
+    }
+
+    .card {
+      background: var(--bg-slide);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 24px 28px;
+      box-shadow: var(--shadow-card);
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+
+    .card .card-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+
+    .card .card-num {
+      font-family: var(--font-outfit);
+      font-size: 16px;
+      font-weight: 800;
+      color: var(--accent);
+      background: var(--accent-soft);
+      padding: 4px 10px;
+      border-radius: 8px;
+    }
+
+    .card .card-tag {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      color: var(--text-mute);
+    }
+
+    .card h3 {
+      font-size: 22px;
+      font-weight: 800;
+      color: var(--text);
+      margin-bottom: 10px;
+      letter-spacing: -0.015em;
+    }
+
+    .card p {
+      font-size: 15px;
+      color: var(--text-dim);
+      line-height: 1.6;
+      margin-bottom: 16px;
+    }
+
+    .card .metric {
+      margin-top: auto;
+      padding: 14px 18px;
+      background: var(--accent-soft);
+      border: 1px solid var(--accent-line);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .card .metric .val {
+      font-family: var(--font-mono);
+      font-size: 24px;
+      font-weight: 800;
+      color: var(--accent);
+    }
+
+    .card .metric .lbl {
+      font-size: 12px;
+      color: var(--text-dim);
+      line-height: 1.3;
+      font-weight: 600;
+    }
+
+    .code-inline {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+
+    /* ============================================================
+     SLIDE SPECIFIC STYLES
+     ============================================================ */
+
+    /* Slide 1: Cover */
+    .cover-slide {
+      background: radial-gradient(circle at top right, rgba(59, 130, 246, 0.15) 0%, var(--bg-slide) 70%);
+      justify-content: center;
+      align-items: flex-start;
+      padding-left: 100px;
+    }
+
+    .cover-slide h1 {
+      font-size: 68px;
+      font-weight: 900;
+      letter-spacing: -0.03em;
+      line-height: 1.1;
+      margin-bottom: 64px;
+      background: linear-gradient(135deg, var(--text) 50%, var(--accent) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      color: var(--text); /* Fallback for rendering engines that don't support text clipping */
+    }
+
+    .cover-slide .meta-list {
+      display: flex;
+      gap: 40px;
+    }
+
+    .cover-slide .meta-item {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .cover-slide .meta-item .lbl {
+      font-size: 12px;
+      color: var(--text-mute);
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+
+    .cover-slide .meta-item .val {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text-dim);
+    }
+
+    /* Slide 2: Problem Definition */
+    .problem-grid {
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      gap: 32px;
+      flex: 1;
+      min-height: 0;
+    }
+
+    .problem-list {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      justify-content: center;
+    }
+
+    .problem-card-v2 {
+      background: #ffffff;
+      border: 1.5px solid var(--border);
+      border-radius: 20px;
+      padding: 24px 30px;
+      box-shadow: var(--shadow-card);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .problem-card-v2 .card-title-row {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      font-size: 24px;
+      font-weight: 800;
+    }
+
+    .problem-card-v2 .card-title-row .num {
+      color: #111827;
+      font-family: var(--font-outfit);
+    }
+
+    .problem-card-v2.p-blue .card-title-row .title-text {
+      color: #2563eb;
+    }
+
+    .problem-card-v2.p-red .card-title-row .title-text {
+      color: #ef4444;
+    }
+
+    .problem-card-v2 .card-divider {
+      height: 1px;
+      background: #e5e7eb;
+      margin: 14px 0;
+    }
+
+    .problem-card-v2 .card-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .problem-card-v2 .card-list li {
+      font-size: 15px;
+      color: var(--text-dim);
+      line-height: 1.6;
+      font-weight: 500;
+      padding-left: 0;
+    }
+
+    .problem-image-card {
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      box-shadow: var(--shadow-card);
+      background: var(--bg-slide);
+      padding: 12px;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .problem-image-card img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      border-radius: 8px;
+    }
+
+    /* Slide 6: Architecture Diagram Embedding */
+    .arch-container {
+      display: grid;
+      grid-template-columns: 1fr 1.2fr;
+      gap: 32px;
+      flex: 1;
+      min-height: 0;
+    }
+
+    .arch-desc-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      justify-content: center;
+    }
+
+    .arch-desc-item {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 16px;
+      background: var(--accent-soft);
+    }
+
+    .arch-desc-item h4 {
+      font-size: 15px;
+      font-weight: 700;
+      margin-bottom: 2px;
+      color: var(--accent);
+    }
+
+    .arch-desc-item p {
+      font-size: 13px;
+      color: var(--text-dim);
+      line-height: 1.4;
+    }
+
+    .arch-img-frame {
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: var(--shadow-card);
+      background: #101524;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 10px;
+    }
+
+    .arch-img-frame img {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+      border-radius: 8px;
+    }
+
+    /* Slide 7: Implementation Boundary */
+    .impl-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+      flex: 1;
+      min-height: 0;
+    }
+
+    .impl-card {
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 20px 24px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .impl-card.fe {
+      border-top: 4px solid var(--accent);
+    }
+
+    .impl-card.be {
+      border-top: 4px solid var(--success);
+    }
+
+    .impl-card.sc {
+      border-top: 4px solid #8b5cf6;
+    }
+
+    .impl-card h3 {
+      font-size: 20px;
+      font-weight: 800;
+      margin-bottom: 12px;
+    }
+
+    .impl-card.fe h3 {
+      color: var(--accent);
+    }
+
+    .impl-card.be h3 {
+      color: var(--success);
+    }
+
+    .impl-card.sc h3 {
+      color: #8b5cf6;
+    }
+
+    .impl-card ul {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .impl-card li {
+      font-size: 13.5px;
+      color: var(--text-dim);
+      line-height: 1.5;
+      padding-left: 14px;
+      position: relative;
+    }
+
+    .impl-card li::before {
+      content: '✓';
+      position: absolute;
+      left: 0;
+      color: inherit;
+      font-weight: bold;
+    }
+
+    .impl-card .member-tag {
+      font-size: 12px;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 6px;
+      margin-bottom: 16px;
+      display: inline-block;
+      align-self: flex-start;
+    }
+
+    .impl-card.fe .member-tag {
+      background: var(--accent-soft);
+      color: var(--accent);
+      border: 1px solid var(--accent-line);
+    }
+
+    .impl-card.be .member-tag {
+      background: var(--success-soft);
+      color: var(--success);
+      border: 1px solid rgba(16, 185, 129, 0.15);
+    }
+
+    .impl-card.sc .member-tag {
+      background: rgba(139, 92, 246, 0.05);
+      color: #8b5cf6;
+      border: 1px solid rgba(139, 92, 246, 0.15);
+    }
+
+    /* Slide 9: Demo Guide */
+    .demo-step-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      height: 300px;
+      margin: auto 0;
+    }
+
+    .demo-step-card {
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 24px 20px;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      background: var(--accent-soft);
+    }
+
+    .demo-step-card .step-lbl {
+      font-family: var(--font-outfit);
+      font-size: 12px;
+      font-weight: 800;
+      color: var(--accent);
+      margin-bottom: 8px;
+    }
+
+    .demo-step-card h4 {
+      font-size: 16px;
+      font-weight: 800;
+      margin-bottom: 6px;
+    }
+
+    .demo-step-card p {
+      font-size: 12.5px;
+      color: var(--text-dim);
+      line-height: 1.55;
+    }
+
+    /* Slide 10: Q&A */
+    .qa-box {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px 20px;
+      margin-bottom: 12px;
+      background: var(--accent-soft);
+    }
+
+    .qa-box h4 {
+      font-size: 15px;
+      font-weight: 800;
+      color: var(--accent);
+      margin-bottom: 4px;
+    }
+
+    .qa-box p {
+      font-size: 13.5px;
+      color: var(--text-dim);
+      line-height: 1.5;
+    }
+
+    /* ============================================================
+     SLIDE 8-ALT — SEPOLIA DEPLOYMENT
+     ============================================================ */
+    .sepolia-v2 {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      flex: 1;
+      min-height: 0;
+    }
+
+    .sepolia-v2 .addr-pill {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 14px 24px;
+      background: var(--accent-soft);
+      border: 1px solid var(--accent-line);
+      border-radius: 12px;
+      box-shadow: var(--shadow-card);
+    }
+
+    .sepolia-v2 .addr-pill .label {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--accent);
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+      font-weight: 800;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .sepolia-v2 .addr-pill .value {
+      font-family: var(--font-mono);
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: -0.005em;
+      word-break: break-all;
+      flex: 1;
+    }
+
+    .sepolia-v2 .addr-pill .value .accent {
+      color: var(--accent);
+    }
+
+    .sepolia-v2 .addr-pill .meta {
+      display: flex;
+      gap: 12px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-dim);
+      flex-shrink: 0;
+    }
+
+    .sepolia-v2 .addr-pill .meta .chip {
+      padding: 4px 10px;
+      background: var(--bg-slide);
+      border: 1px solid var(--accent-line);
+      border-radius: 999px;
+      color: var(--accent);
+      font-weight: 700;
+    }
+
+    .sepolia-v2 .shot {
+      flex: 1;
+      min-height: 0;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      overflow: hidden;
+      background: #101524;
+      box-shadow: var(--shadow-card);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .sepolia-v2 .shot .shot-head {
+      padding: 10px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-mute);
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      flex-shrink: 0;
+    }
+
+    .sepolia-v2 .shot .shot-head .live {
+      color: var(--success);
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .sepolia-v2 .shot .shot-head .live .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--success);
+      box-shadow: 0 0 6px var(--success);
+    }
+
+    .sepolia-v2 .shot .shot-img {
+      flex: 1;
+      min-height: 0;
+      overflow: hidden;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 12px;
+    }
+
+    .sepolia-v2 .shot .shot-img img {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+      border-radius: 8px;
+    }
+
+    .sepolia-v2 .caption {
+      font-size: 14.5px;
+      color: var(--text-dim);
+      line-height: 1.5;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-shrink: 0;
+    }
+
+    .sepolia-v2 .caption .em {
+      color: var(--text);
+      font-weight: 700;
+    }
+
+    .sepolia-v2 .caption .verify-mini {
+      display: flex;
+      gap: 8px;
+      margin-left: auto;
+      flex-shrink: 0;
+    }
+
+    .sepolia-v2 .caption .verify-mini .vb {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 700;
+      border: 1px solid var(--accent-line);
+      background: var(--accent-soft);
+      color: var(--accent);
+    }
+
+    .sepolia-v2 .caption .verify-mini .etherscan-btn-mini {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 12px;
+      border-radius: 999px;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 800;
+      background: var(--accent);
+      color: #ffffff;
+      text-decoration: none;
+      box-shadow: 0 2px 8px rgba(37, 99, 235, 0.2);
+      transition: all 0.2s ease;
+    }
+
+    .sepolia-v2 .caption .verify-mini .etherscan-btn-mini:hover {
+      background: var(--accent-dark);
+      transform: translateY(-1px);
+    }
+
+    .slide-desc {
+      font-size: 16.5px;
+      font-weight: 700;
+      color: var(--text);
+      line-height: 1.65;
+      margin-bottom: 24px;
+      padding: 14px 20px;
+      border-left: 5px solid var(--accent);
+      background: var(--accent-soft);
+      border-radius: 8px;
+      flex-shrink: 0;
+    }
+
+    /* Print styling */
+    @media print {
+      @page {
+        size: 1280px 720px;
+        margin: 0;
+      }
+
+      html, body {
+        background: #ffffff !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        overflow: hidden !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+
+      .slide {
+        margin: 0 !important;
+        padding: 56px 64px !important;
+        box-shadow: none !important;
+        border: none !important;
+        border-radius: 0 !important;
+        background: #ffffff !important;
+        width: 1280px !important;
+        height: 720px !important;
+        page-break-after: always !important;
+        break-after: page !important;
+        box-sizing: border-box !important;
+        position: relative !important;
+        display: flex !important;
+        flex-direction: column !important;
+        overflow: hidden !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+
+      .cover-slide {
+        background: radial-gradient(circle at top right, rgba(59, 130, 246, 0.15) 0%, #ffffff 70%) !important;
+      }
+
+      .cover-slide h1 {
+        background: none !important;
+        -webkit-background-clip: initial !important;
+        -webkit-text-fill-color: initial !important;
+        background-clip: initial !important;
+        color: #111827 !important;
+      }
+
+      .brand-mark, .page-num {
+        position: absolute !important;
+        bottom: 28px !important;
+        font-size: 12px !important;
+        color: var(--text-mute) !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+
+      .brand-mark {
+        left: 64px !important;
+      }
+
+      .page-num {
+        right: 64px !important;
+      }
+
+      /* PDF에서는 모든 box-shadow 제거 (Chrome이 그림자를 단단한 회색으로 렌더링해서 이상하게 보임) */
+      *, *::before, *::after {
+        box-shadow: none !important;
+      }
+
+      /* 카드 테두리만 깔끔하게 강제 */
+      .problem-card-v2 {
+        border: 1.5px solid #d1d5db !important;
+        background: #ffffff !important;
+      }
+
+      .problem-image-card,
+      .card,
+      .arch-img-frame,
+      .arch-desc-item,
+      .impl-card,
+      .demo-step-card,
+      .qa-box,
+      .sepolia-v2 .addr-pill,
+      .sepolia-v2 .shot {
+        border: 1px solid #d1d5db !important;
+      }
+
+      /* 색상으로 구분되는 top-border는 우선 적용 */
+      .impl-card.fe { border-top: 4px solid var(--accent) !important; }
+      .impl-card.be { border-top: 4px solid var(--success) !important; }
+      .impl-card.sc { border-top: 4px solid #8b5cf6 !important; }
+
+      .controls {
+        display: none !important;
+      }
+    }
+  </style>
+</head>
+
+<body class="light-theme">
+
+  <!-- ============================ SLIDE 1 — COVER ============================ -->
+  <section class="slide cover-slide">
+    <h1>블록체인 기반<br />NFT 바우처 시스템</h1>
+    <div class="meta-list">
+      <div class="meta-item">
+        <span class="lbl">TEAM</span>
+        <span class="val">조익준, 정재현, 조현, 황종훈</span>
+      </div>
+      <div class="meta-item">
+        <span class="lbl">Date</span>
+        <span class="val">2026.06.19</span>
+      </div>
+      <div class="meta-item">
+        <span class="lbl">Tech Stack</span>
+        <span class="val">React / Spring Boot / Solidity</span>
+      </div>
+    </div>
+    <span class="brand-mark">Voucher DApp</span>
+    <span class="page-num">01 / 10</span>
+  </section>
+
+  <!-- ============================ SLIDE 2 — PROBLEM DEFINITION ============================ -->
+  <section class="slide">
+    <div class="slide-header">
+      <div class="left">
+        <span class="title-rail"></span>
+        <div class="title-block">
+          <span class="eyebrow">Problem Definition</span>
+          <h2 class="section-title">주제 정의 및 기존 시스템의 문제의식</h2>
+        </div>
+      </div>
+      <span class="num-large">02 / 10</span>
+    </div>
+
+    <div class="problem-grid">
+      <div class="problem-list">
+        <div class="problem-card-v2 p-blue">
+          <div class="card-title-row">
+            <span class="num">01</span>
+            <span class="title-text">행정 효율성 저하</span>
+          </div>
+          <div class="card-divider"></div>
+          <ul class="card-list">
+            <li>실시간 추적 불가로 인한 예산 관리의 어려움</li>
+            <li>수기 정산 프로세스로 인한 막대한 행정력 낭비</li>
+          </ul>
+        </div>
+
+        <div class="problem-card-v2 p-red">
+          <div class="card-title-row">
+            <span class="num">02</span>
+            <span class="title-text">신뢰도 및 투명성 결여</span>
+          </div>
+          <div class="card-divider"></div>
+          <ul class="card-list">
+            <li>불법 현금화 및 타인 양도 등 부정 사용 급증</li>
+            <li>부정 사용 적발을 위한 사후 검토 비용 과다</li>
+            <li>기관과 가맹점 간의 데이터 불일치 발생</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="problem-image-card">
+        <img src="./captures/news-thumbnails.jpeg" alt="쿠폰 부정유통 보도 갈무리" />
+      </div>
+    </div>
+
+    <span class="brand-mark">Problem definition</span>
+    <span class="page-num">02 / 10</span>
+  </section>
+
+  <!-- ============================ SLIDE 3 — TECH BLOCK A ============================ -->
+  <section class="slide">
+    <div class="slide-header">
+      <div class="left">
+        <span class="title-rail"></span>
+        <div class="title-block">
+          <span class="eyebrow">Blockchain Utilization: Part A</span>
+          <h2 class="section-title">블록체인 활용 1: 바우처 생성 및 NFT 발급</h2>
+        </div>
+      </div>
+      <span class="num-large">03 / 10</span>
+    </div>
+
+    <div class="slide-desc">
+      정부나 지자체 같은 발행 기관이 바우처를 생성하고, 적합한 사용자에게 배포하는 단계에서 스마트 컨트랙트를 통한 권한 제어와 ERC-721 NFT 표준을 활용했습니다. </div>
+
+    <div class="grid-2x1">
+      <div class="card">
+        <div class="card-head">
+          <span class="card-num">01</span>
+          <span class="card-tag">Voucher.sol: onlyOwner</span>
+        </div>
+        <h3>1. 바우처 프로그램 등록 및 발행 통제</h3>
+        <p>어드민(발행 기관)이 예산 한도, 유효 기간, 사용 카테고리를 설정하면 블록체인 컨트랙트 내에 변수로 직접 등록됩니다. 백엔드가 신청자의 나이와 지역을 사전에 검증하고,
+          검증을 통과한 수혜자에 한해 백엔드 지갑의 관리자 권한(onlyOwner)을 사용하여 온체인 상에 안전하게 NFT 바우처를 발행(mintVoucher)합니다.</p>
+        <div class="metric">
+          <span class="val">mintVoucher</span>
+          <span class="lbl">컨트랙트 규칙에 따른<br />신뢰성 있는 NFT 발행</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <span class="card-num">02</span>
+          <span class="card-tag">Voucher.sol: ERC-721</span>
+        </div>
+        <h3>2. 대체 불가능한 소유권 증명</h3>
+        <p>발행된 바우처는 수혜자의 지갑 주소에 1:1로 묶이는 고유한 NFT(ERC-721)로 귀속됩니다. 블록체인 표준 기술을 활용해 타인에게 무단으로 양도되거나 복제되는 것을 원천 차단하고, 지갑
+          주소를 통해 실제 소유주와 만료일을 실시간으로 확실하게 추적하고 입증합니다.</p>
+        <div class="metric">
+          <span class="val">ERC-721</span>
+          <span class="lbl">지갑 귀속형 구조로<br />무단 양도 및 복제 차단</span>
+        </div>
+      </div>
+    </div>
+
+    <span class="brand-mark">Smart contract part a</span>
+    <span class="page-num">03 / 10</span>
+  </section>
+
+  <!-- ============================ SLIDE 4 — TECH BLOCK B ============================ -->
+  <section class="slide">
+    <div class="slide-header">
+      <div class="left">
+        <span class="title-rail"></span>
+        <div class="title-block">
+          <span class="eyebrow">Blockchain Utilization: Part B</span>
+          <h2 class="section-title">블록체인 활용 2: EIP-712 가스리스 결제</h2>
+        </div>
+      </div>
+      <span class="num-large">04 / 10</span>
+    </div>
+
+    <div class="slide-desc">
+      사용자가 직접 블록체인 네트워크에 트랜잭션을 전송하지 않고, 오프체인에서 서명만 생성하면 백엔드가 가스비를 내며 트랜잭션을 대신 전송(대납)해 주는
+      메타-트랜잭션 구조로 블록체인을 활용했습니다. 이때, 결제의 신뢰성을 확보하기 위해 두 가지 블록체인 표준 기술을 결합했습니다
+    </div>
+
+    <div class="grid-2x1">
+      <div class="card">
+        <div class="card-head">
+          <span class="card-num">03</span>
+          <span class="card-tag">EIP-712 Standard</span>
+        </div>
+        <h3>1. EIP-712 기술</h3>
+        <p>사용자가 서명할 때 결제 조건(금액, 가맹점, 토큰 ID 등)을 메타마스크 화면에 사람이 읽을 수 있는 텍스트로 보여주어 안심하고 결제 서명을 할 수 있도록 돕습니다.</p>
+        <div class="metric">
+          <span class="val">0 ETH</span>
+          <span class="lbl">사람이 읽을 수 있는 영수증<br />결제 데이터 가시성 제공</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <span class="card-num">04</span>
+          <span class="card-tag">ECDSA Verification</span>
+        </div>
+        <h3>2. ECDSA 서명 검증</h3>
+        <p>백엔드 서버가 사용자의 서명을 넘겨받아 가스비를 대신 지불하고 블록체인에 전송합니다. 스마트 컨트랙트는 <code>ECDSA.recover</code> 함수를 통해 서명값으로부터 서명자의 지갑
+          주소를 역으로 복원한 뒤, 이 주소가 실제 바우처 소유자의 지갑 주소와 일치하는지 판별하여 안전하게 승인합니다.</p>
+        <div class="metric">
+          <span class="val">ECDSA.recover</span>
+          <span class="lbl">대납 트랜잭션 내 서명 복원<br />100% 온체인 실시간 검증</span>
+        </div>
+      </div>
+    </div>
+
+    <span class="brand-mark">Smart contract part b</span>
+    <span class="page-num">04 / 10</span>
+  </section>
+
+  <!-- ============================ SLIDE 5 — TECH BLOCK C ============================ -->
+  <section class="slide">
+    <div class="slide-header">
+      <div class="left">
+        <span class="title-rail"></span>
+        <div class="title-block">
+          <span class="eyebrow">Blockchain Utilization: Part C</span>
+          <h2 class="section-title">블록체인 활용 3: 온체인 차감 및 영수증 앵커링</h2>
+        </div>
+      </div>
+      <span class="num-large">05 / 10</span>
+    </div>
+
+    <div class="slide-desc">
+      바우처의 실시간 온체인 잔액 관리와 결제 내역의 위변조 방지를 위해 블록체인을 활용했습니다.
+    </div>
+
+    <div class="grid-2x1">
+      <div class="card">
+        <div class="card-head">
+          <span class="card-num">05</span>
+          <span class="card-tag">Voucher.sol: _useVoucher</span>
+        </div>
+        <h3>1. 하이브리드 NFT 잔액 실시간 차감</h3>
+        <p>단순히 소유권만 이전하는 일반 NFT(ERC-721) 표준의 한계를 극복하기 위해, 스마트 컨트랙트 내부에 개별 바우처의 잔액 상태값(voucherValue)을 직접 관리하도록 확장 구현했습니다.
+          사용자가 결제할 때마다 온체인 잔액이 실시간으로 차감되며, 잔액이 0원이 되면 자동으로 사용 완료(USED) 상태로 전환되어 재사용이 원천 차단됩니다.</p>
+        <div class="metric">
+          <span class="val">values[id]</span>
+          <span class="lbl">결제 금액 실시간 차감<br />잔액 소진 시 USED 전환</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <span class="card-num">06</span>
+          <span class="card-tag">VoucherUsed Event</span>
+        </div>
+        <h3>2. 영수증 해시 온체인 기록 </h3>
+        <p>상세한 결제 명세서(구매 물품, 가맹점 정보 등)를 온체인에 그대로 기록하면 막대한 가스비가 발생합니다. 따라서 상세 이력은 백엔드 RDB에 안전하게 저장하되, 해당 영수증 데이터의
+          해시값을 온체인에 영구 박제합니다. 이를 통해 사후에 백엔드 RDB가 조작되더라도 온체인 해시와 대조하여
+          데이터 위변조를 즉각 적발해 낼 수 있습니다.</p>
+        <div class="metric">
+          <span class="val">Keccak256</span>
+          <span class="lbl">이중 해시 대조를 통한<br />데이터베이스 신뢰성 보증</span>
+        </div>
+      </div>
+    </div>
+
+    <span class="brand-mark">Smart contract part c</span>
+    <span class="page-num">05 / 10</span>
+  </section>
+
+  <!-- ============================ SLIDE 6 — SYSTEM ARCHITECTURE ============================ -->
+  <section class="slide">
+    <div class="slide-header">
+      <div class="left">
+        <span class="title-rail"></span>
+        <div class="title-block">
+          <span class="eyebrow">Architecture Diagram</span>
+          <h2 class="section-title">시스템 아키텍처 및 무결성 구조 (4-Layer)</h2>
+        </div>
+      </div>
+      <span class="num-large">06 / 10</span>
+    </div>
+
+    <div class="arch-container">
+      <div class="arch-desc-list">
+        <div class="arch-desc-item">
+          <h4>L1: Frontend Layer (React + TS)</h4>
+          <p>사용자 지갑(메타마스크) 연동 및 로그인, 가맹점 QR 코드 스캔, EIP-712 기반의 안전한 결제 서명 생성</p>
+        </div>
+        <div class="arch-desc-item">
+          <h4>L2: Backend Layer (Spring Boot + Web3j)</h4>
+          <p>회원 JWT 인증 및 자격(나이·지역) 검증, 메타마스크용 EIP-712 영수증 데이터 빌드, Web3j를 통한 대납 트랜잭션 전송</p>
+        </div>
+        <div class="arch-desc-item">
+          <h4>L3: Blockchain Layer (Solidity + Ganache)</h4>
+          <p>스마트 컨트랙트 기반 온체인 서명 검증, 승인된 가맹점(화이트리스트) 체크, 실시간 잔액 차감 및 이벤트 영구 기록</p>
+        </div>
+        <div class="arch-desc-item">
+          <h4>L4: Verification Layer (Scanner & Integrity Verifier)</h4>
+          <p>블록체인 결제 이벤트 감지, 백엔드 DB 내역과 온체인 해시값의 상호 대조를 통한 데이터 위변조 검증</p>
+        </div>
+      </div>
+
+      <div class="arch-img-frame">
+        <img src="architecture_diagram.jpg" alt="시스템 아키텍처 다이어그램" />
+      </div>
+    </div>
+
+    <span class="brand-mark">System architecture</span>
+    <span class="page-num">06 / 10</span>
+  </section>
+
+  <!-- ============================ SLIDE 7 — IMPLEMENTATION BOUNDARY ============================ -->
+  <section class="slide">
+    <div class="slide-header">
+      <div class="left">
+        <span class="title-rail"></span>
+        <div class="title-block">
+          <span class="eyebrow">Implementation Scope</span>
+          <h2 class="section-title">프론트 / 백엔드 / 컨트랙트 구현 범위 및 역할 분담</h2>
+        </div>
+      </div>
+      <span class="num-large">07 / 10</span>
+    </div>
+
+    <div class="impl-grid">
+      <div class="impl-card fe">
+        <h3>프론트엔드 (React + TS)</h3>
+        <span class="member-tag">담당: 조익준</span>
+        <ul>
+          <li><strong>지갑 연동:</strong> MetaMask 지갑 연결 상태 감지 및 WalletContext 전역 관리</li>
+          <li><strong>인증 및 보안:</strong> 일회용 Nonce API 연동 ➔ MetaMask 로그인 서명 ➔ JWT 토큰 발급 및 로컬 스토리지 보관 ➔ API 호출 시 헤더에 자동 주입
+          </li>
+          <li><strong>역할별 전용 페이지 UI (사용자, 가맹점, 기관):</strong> 로그인한 지갑 주소의 역할(Role)에 따라 완전히 다른 대시보드로 이동</li>
+          <li><strong>결제 서명:</strong> 메타마스크 팝업 창을 띄워 EIP-712 규격의 영수증(금액, 토큰 ID, 가맹점 등)을 띄우고 서명 데이터 추출</li>
+        </ul>
+      </div>
+
+      <div class="impl-card be">
+        <h3>백엔드 (Spring Boot + MySQL)</h3>
+        <span class="member-tag">담당: 정재현</span>
+        <ul>
+          <li><strong>회원 및 권한 관리:</strong> 회원가입(수혜자/가맹점 분기), 지갑 로그인 시 JWT 토큰 생성 및 필터 검증</li>
+          <li><strong>자격 검증 로직:</strong> 사용자가 바우처를 신청할 때, DB에 저장된 나이(생년월일)와 거주 지역 정보가 바우처 제한 요건과 맞물리는지 실시간 검증</li>
+          <li><strong>결제 세션 관리:</strong> 가맹점의 결제 금액을 기반으로 10분 만료 시간이 세팅된 UUID 결제 세션 생성 및 라이프사이클 관리</li>
+          <li><strong>Web3j 온체인 연동:</strong> 백엔드 Sponsor 지갑(개인키)을 메모리에 로드하여, 트랜잭션을 전송하고 가스비를 대납하는 엔진 구현</li>
+          <li><strong>이벤트 스캐너:</strong> 블록체인상의 VoucherUsed 이벤트 로그를 감지하여 DB 내역과 온체인 해시값을 상호 교차 대조하는 검증 API 구현</li>
+        </ul>
+      </div>
+
+      <div class="impl-card sc">
+        <h3>스마트 컨트랙트 (Solidity)</h3>
+        <span class="member-tag">담당: 조현 (인프라 &amp; 데이터 검증), 황종훈 (컨트랙트 개발)</span>
+        <ul>
+          <li><strong>바우처 토큰 설계:</strong> OpenZeppelin의 ERC721Enumerable을 상속받은 바우처 토큰 설계</li>
+          <li><strong>온체인 잔액 기능 개발:</strong> voucherValue 매핑을 통해 각 토큰 ID별로 실시간 잔액을 추적하고, 만료 여부를 판정하는 온체인 상태 데이터 관리</li>
+          <li><strong>가맹점 화이트리스트:</strong> 등록된 가맹점 지갑 주소만 바우처 결제를 수납할 수 있도록 승인 상태 관리</li>
+          <li><strong>온체인 서명 복원:</strong> 백엔드가 전송한 사용자의 EIP-712 서명을 해독하여 실제 소유주 지갑이 서명한 것이 맞는지 검증 (ECDSA.recover)</li>
+          <li><strong>인프라 및 검증:</strong> 로컬 테스트넷 구축, Truffle 기반 테스트 및 Sepolia 공개 테스트넷 배포, Event Scanner 연동 설계</li>
+        </ul>
+      </div>
+    </div>
+
+    <span class="brand-mark">Implementation Scope</span>
+    <span class="page-num">07 / 10</span>
+  </section>
+
+  <!-- ============================ SLIDE 8 — SEPOLIA DEPLOYMENT ============================ -->
+  <section class="slide">
+    <div class="slide-header">
+      <div class="left">
+        <span class="title-rail"></span>
+        <div class="title-block">
+          <span class="eyebrow">Public Deployment</span>
+          <h2 class="section-title">Sepolia 공개 테스트넷 배포 및 동작 증명</h2>
+        </div>
+      </div>
+      <span class="num-large">08 / 10</span>
+    </div>
+
+    <div class="sepolia-v2">
+      <div class="addr-pill">
+        <span class="label">Contract</span>
+        <span class="value"><span class="accent">0x</span>002E36f608C284C3f57308704b3ae99Fb1839bc7</span>
+        <span class="meta">
+          <span class="chip">Sepolia</span>
+          <span class="chip">Chain ID 11155111</span>
+        </span>
+      </div>
+
+      <div class="shot">
+        <div class="shot-head">
+          <span>sepolia.etherscan.io · Events</span>
+          <span class="live"><span class="dot"></span>LIVE</span>
+        </div>
+        <div class="shot-img">
+          <img src="./captures/sepolia-etherscan-events.png" alt="Sepolia Etherscan 이벤트 로그" />
+        </div>
+      </div>
+
+      <div class="caption">
+        <span><span class="em">이더리움 Sepolia 공개 테스트넷</span> 배포 완료 — 이더스캔 포털(<span
+            style="color: var(--accent); font-weight: 700;">sepolia.etherscan.io</span>)에서 위 Contract 주소를 검색해 실시간 온체인
+          코드와 트랜잭션을 직접 검증해 볼 수 있습니다.</span>
+        <span class="verify-mini">
+          <span class="vb"
+            style="background: var(--accent-soft); color: var(--accent); border-color: var(--accent-line); font-weight: 800;">sepolia.etherscan.io</span>
+          <span class="vb"><span class="ck">✓</span>Sourcify</span>
+          <span class="vb"><span class="ck">✓</span>Blockscout</span>
+        </span>
+      </div>
+    </div>
+
+    <span class="brand-mark">Sepolia Deployment</span>
+    <span class="page-num">08 / 10</span>
+  </section>
+
+  <!-- ============================ SLIDE 9 — DEMO SCENARIO ============================ -->
+  <section class="slide">
+    <div class="slide-header">
+      <div class="left">
+        <span class="title-rail"></span>
+        <div class="title-block">
+          <span class="eyebrow">Demo Scenario</span>
+          <h2 class="section-title">최종 시연 시나리오 관전 포인트</h2>
+        </div>
+      </div>
+      <span class="num-large">09 / 10</span>
+    </div>
+
+    <div class="demo-step-row">
+      <div class="demo-step-card">
+        <span class="step-lbl">STAGE 01</span>
+        <h4>바우처 등록</h4>
+        <p>기관 어드민 지갑이 50,000원 상당의 바우처 프로그램을 컨트랙트에 신규 등록하는 과정을 보여줍니다.</p>
+      </div>
+
+      <div class="demo-step-card">
+        <span class="step-lbl">STAGE 02</span>
+        <h4>수혜자 발급 (Mint)</h4>
+        <p>일반 유저가 가입 후 신청을 진행하면 백엔드 가스 대납을 거쳐 유저의 지갑에 바우처 NFT가 성공적으로 민팅되는 과정입니다.</p>
+      </div>
+
+      <div class="demo-step-card">
+        <span class="step-lbl">STAGE 03</span>
+        <h4>가맹점 QR 결제 (EIP-712)</h4>
+        <p>유저가 QR을 띄우고 가맹점이 QR을 스캔한뒤 금액을 입력하면 유저가 MetaMask 서명을 승인, 가스비 대납 하에 실시간 잔액이 차감되는 핵심 컷입니다.</p>
+      </div>
+
+      <div class="demo-step-card">
+        <span class="step-lbl">STAGE 04</span>
+        <h4>온체인 무결성 검증</h4>
+        <p>Truffle 콘솔로 온체인 VoucherUsed 이벤트 및 DB 영수증 해시의 교차 검증 통과를 입증하며 데이터의 무결성을 최종 증명합니다.</p>
+      </div>
+    </div>
+
+    <span class="brand-mark">Demo scenario</span>
+    <span class="page-num">09 / 10</span>
+  </section>
+
+  <!-- ============================ SLIDE 10 — Q&A ============================ -->
+  <section class="slide">
+    <div class="slide-header">
+      <div class="left">
+        <span class="title-rail"></span>
+        <div class="title-block">
+          <span class="eyebrow">Q&A Checklist</span>
+          <h2 class="section-title">APPENDIX - Q&A</h2>
+        </div>
+      </div>
+      <span class="num-large">10 / 10</span>
+    </div>
+
+    <div style="display:flex; flex-direction:column; justify-content:center; flex:1; min-height:0;">
+      <div class="qa-box">
+        <h4>Q1. 왜 ERC-20이 아닌 ERC-721(NFT)을 활용해 설계했나요?</h4>
+        <p>A. ERC-20은 단일 가치만 다루므로 복수의 바우처 관리나 개별 만료일 추적이 어렵습니다. ERC-721을 기반으로 해야 고유 토큰 ID를 활용해 만료 기간, 수혜자 정보, 카테고리 등을
+          개별적으로 확실하게 통제할 수 있습니다.</p>
+      </div>
+
+      <div class="qa-box">
+        <h4>Q2. 사용자가 가스비를 안 내면, 백엔드 지갑은 어떻게 가스비를 지출하나요?</h4>
+        <p>A. 대납용 백엔드 지갑의 개인키가 백엔드 환경 설정에 안전하게 보관되어 있으며, 사용자의 MetaMask EIP-712 서명을 받아 백엔드가 대납하여 온체인 트랜잭션 전송을
+          실행하는 구조입니다.</p>
+      </div>
+
+      <div class="qa-box">
+        <h4>Q3. 결제 이력을 DB에 저장하면서 온체인 앵커링을 병행한 이유는 무엇인가요?</h4>
+        <p>A. 빠른 실시간 결제와 다량의 이력 관리를 온체인으로만 처리하면 가스비 비용이 너무 큽니다. 따라서 효율적이고 빠른 조회를 위해 상세 이력은 RDB에 저장하되, 무결성 검증용 해시만을 온체인에
+          기록해 조작을 차단하는 하이브리드 설계를 채택했습니다.</p>
+      </div>
+
+      <div class="qa-box">
+        <h4>Q4. 사용자가 백엔드 검증을 우회하여 직접 컨트랙트에서 바우처를 발급받으면 어떻게 하나요?</h4>
+        <p>A. 프로그램 생성, 바우처 발급 등 핵심 관리자 함수는 <code>onlyOwner</code> 제어자로 보호됩니다. Owner 권한은 백엔드 서버의 대납용 지갑에만 부여되어 있어,
+          비인가 계정이 직접 컨트랙트를 호출하더라도 EVM 수준에서 즉시 Revert(실패) 처리됩니다.</p>
+      </div>
+    </div>
+
+    <span class="brand-mark">Questions & answers</span>
+    <span class="page-num">10 / 10</span>
+  </section>
+
+</body>
+
+</html>

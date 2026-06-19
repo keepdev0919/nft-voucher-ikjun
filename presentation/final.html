@@ -1,0 +1,2759 @@
+<!doctype html>
+<html lang="ko">
+
+<head>
+  <meta charset="utf-8" />
+  <title>블록체인 기반 NFT 바우처 시스템 — 최종 발표</title>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" />
+  <link rel="stylesheet"
+    href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/variable/pretendardvariable.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/JetBrains/JetBrainsMono/web/css/jetbrains-mono.css" />
+  <style>
+    :root {
+      /* ===== base ===== */
+      --bg: #ffffff;
+      --surface: #f7f8fc;
+      --surface-hi: #eef1f7;
+
+      /* ===== text ===== */
+      --text: #0f172a;
+      --text-dim: #475569;
+      --text-mute: #94a3b8;
+
+      /* ===== border ===== */
+      --border: #e2e8f0;
+      --border-strong: #cbd5e1;
+
+      /* ===== accent (blue) ===== */
+      --accent: #3B82F6;
+      --accent-dark: #1E40AF;
+      --accent-soft: #dbeafe;
+      --accent-line: #93c5fd;
+
+      /* ===== states ===== */
+      --success: #10b981;
+      --success-soft: #d1fae5;
+      --success-line: #6ee7b7;
+      --warning: #f59e0b;
+      --warning-soft: #fef3c7;
+      --warning-line: #fcd34d;
+      --danger: #ef4444;
+      --danger-soft: #fee2e2;
+      --danger-line: #fca5a5;
+
+      /* ===== shadows ===== */
+      --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 16px rgba(15, 23, 42, 0.04);
+      --shadow-strong: 0 2px 6px rgba(15, 23, 42, 0.06), 0 12px 40px rgba(15, 23, 42, 0.08);
+
+      /* ===== font ===== */
+      --font-sans: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Inter', system-ui, sans-serif;
+      --font-mono: 'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      padding: 0;
+      background: #e8ecf3;
+      color: var(--text);
+      font-family: var(--font-sans);
+      font-feature-settings: "ss01", "ss02", "tnum";
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+      /* 한글 — 어절 단위로만 줄바꿈 (글자 단위 잘림 방지) */
+      word-break: keep-all;
+      overflow-wrap: break-word;
+      line-break: strict;
+    }
+
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 24px;
+      padding: 24px 0;
+    }
+
+    /* ===== Slide base ===== */
+    .slide {
+      width: 1920px;
+      height: 1080px;
+      background: var(--bg);
+      position: relative;
+      overflow: hidden;
+      padding: 88px 120px;
+      display: flex;
+      flex-direction: column;
+      page-break-after: always;
+      break-after: page;
+    }
+
+    .slide:last-child {
+      page-break-after: auto;
+    }
+
+    /* ===== Typography ===== */
+    .eyebrow {
+      font-size: 14px;
+      letter-spacing: 0.3em;
+      color: var(--text-mute);
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+
+    h1.slide-title {
+      font-size: 72px;
+      font-weight: 800;
+      line-height: 1.1;
+      letter-spacing: -0.025em;
+      margin: 0;
+      color: var(--text);
+    }
+
+    h2.section-title {
+      font-size: 48px;
+      font-weight: 800;
+      line-height: 1.15;
+      letter-spacing: -0.025em;
+      margin: 0;
+      color: var(--text);
+    }
+
+    .body-lg {
+      font-size: 24px;
+      line-height: 1.55;
+      color: var(--text-dim);
+    }
+
+    .body-md {
+      font-size: 20px;
+      line-height: 1.6;
+      color: var(--text-dim);
+    }
+
+    .body-sm {
+      font-size: 17px;
+      line-height: 1.55;
+      color: var(--text-mute);
+    }
+
+    .text-strong {
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    .text-dim {
+      color: var(--text-dim);
+    }
+
+    .text-mute {
+      color: var(--text-mute);
+    }
+
+    .accent {
+      color: var(--accent);
+    }
+
+    .danger-em {
+      color: var(--danger);
+      font-weight: 700;
+    }
+
+    .mono {
+      font-family: var(--font-mono);
+      font-feature-settings: "zero", "ss01";
+    }
+
+    /* 코드/주소처럼 끊으면 안 되는 영문 식별자는 break-all 허용 */
+    .mono,
+    .code-inline,
+    .code-block,
+    .qr-code,
+    .addr-block .addr {
+      word-break: break-all;
+      overflow-wrap: anywhere;
+    }
+
+    .qr-code {
+      word-break: normal;
+      overflow-wrap: normal;
+    }
+
+    /* ===== Slide header — PDF signature pattern ===== */
+    .slide-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 56px;
+    }
+
+    .slide-header .left {
+      display: flex;
+      align-items: stretch;
+      gap: 24px;
+    }
+
+    .title-rail {
+      width: 5px;
+      background: var(--accent);
+      border-radius: 4px;
+      flex-shrink: 0;
+    }
+
+    .slide-header .title-block {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      justify-content: center;
+    }
+
+    .slide-header .num-large {
+      font-family: var(--font-mono);
+      font-size: 14px;
+      letter-spacing: 0.25em;
+      color: var(--text-mute);
+      text-transform: uppercase;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* ===== Page footer ===== */
+    .page-num,
+    .brand-mark {
+      display: none !important;
+    }
+
+    /* ===== Generic card ===== */
+    .card {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 36px;
+      box-shadow: var(--shadow-card);
+    }
+
+    /* Card numbered dot (blue circle + white digit) */
+    .card-num {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: var(--accent);
+      color: #fff;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-mono);
+      font-weight: 700;
+      font-size: 16px;
+      letter-spacing: 0.02em;
+      font-variant-numeric: tabular-nums;
+      flex-shrink: 0;
+    }
+
+    .card-num.warning {
+      background: var(--warning);
+    }
+
+    .card-num.danger {
+      background: var(--danger);
+    }
+
+    .card-num.success {
+      background: var(--success);
+    }
+
+    /* ===== Badge ===== */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 14px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      font-size: 12px;
+      color: var(--text-dim);
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .badge .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    .badge.accent {
+      background: var(--accent-soft);
+      border-color: var(--accent-line);
+      color: var(--accent-dark);
+    }
+
+    .badge.success {
+      background: var(--success-soft);
+      border-color: var(--success-line);
+      color: #065f46;
+    }
+
+    .badge.warning {
+      background: var(--warning-soft);
+      border-color: var(--warning-line);
+      color: #92400e;
+    }
+
+    .badge.danger {
+      background: var(--danger-soft);
+      border-color: var(--danger-line);
+      color: #991b1b;
+    }
+
+    /* ===== Code chips ===== */
+    .code-inline {
+      font-family: var(--font-mono);
+      font-size: 0.9em;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 2px 8px;
+      color: var(--text);
+    }
+
+    .code-block {
+      font-family: var(--font-mono);
+      font-size: 15px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 18px 22px;
+      color: var(--text);
+      line-height: 1.6;
+    }
+
+    /* ===== Impact quote (left blue rail) ===== */
+    .impact-quote {
+      padding: 24px 32px;
+      border-left: 4px solid var(--accent);
+      background: var(--accent-soft);
+      border-radius: 4px 14px 14px 4px;
+      font-size: 22px;
+      line-height: 1.5;
+      color: var(--text);
+      font-weight: 500;
+    }
+
+    .impact-quote strong {
+      color: var(--accent-dark);
+      font-weight: 800;
+    }
+
+    /* ============================================================
+     SLIDE 1 — COVER (blue gradient)
+     ============================================================ */
+    .cover {
+      background: linear-gradient(135deg, #3B82F6 0%, #2563EB 50%, #1E40AF 100%);
+      color: #fff;
+      padding: 96px 120px;
+      justify-content: flex-start;
+      overflow: hidden;
+    }
+
+    /* decorative curves */
+    .cover::before {
+      content: '';
+      position: absolute;
+      right: -200px;
+      top: -200px;
+      width: 1100px;
+      height: 1100px;
+      border-radius: 50%;
+      border: 1.5px solid rgba(255, 255, 255, 0.12);
+      pointer-events: none;
+    }
+
+    .cover::after {
+      content: '';
+      position: absolute;
+      right: -400px;
+      top: -100px;
+      width: 1200px;
+      height: 1200px;
+      border-radius: 50%;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      pointer-events: none;
+    }
+
+    .cover .cover-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: relative;
+      z-index: 2;
+    }
+
+    .cover .ptag {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      letter-spacing: 0.4em;
+      color: rgba(255, 255, 255, 0.85);
+      text-transform: uppercase;
+      font-weight: 600;
+      padding: 8px 16px;
+      border: 1px solid rgba(255, 255, 255, 0.35);
+      border-radius: 999px;
+    }
+
+    .cover .ptag-right {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      color: rgba(255, 255, 255, 0.7);
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+    }
+
+    .cover .hero {
+      position: relative;
+      z-index: 2;
+      display: flex;
+      flex-direction: column;
+      gap: 48px;
+      margin-top: 100px;
+    }
+
+    .cover .accent-line {
+      width: 64px;
+      height: 4px;
+      background: #fff;
+      border-radius: 2px;
+    }
+
+    .cover .title {
+      font-size: 128px;
+      font-weight: 800;
+      line-height: 1.05;
+      letter-spacing: -0.04em;
+      margin: 0;
+      color: #fff;
+      text-shadow: 0 4px 30px rgba(0, 0, 0, 0.18);
+    }
+
+    .cover .subtitle {
+      font-size: 32px;
+      font-weight: 500;
+      color: rgba(255, 255, 255, 0.92);
+      line-height: 1.4;
+      letter-spacing: -0.01em;
+      max-width: 1100px;
+    }
+
+    .cover .subtitle .em {
+      color: #fff;
+      font-weight: 700;
+    }
+
+    .cover .cover-bottom {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      position: relative;
+      z-index: 2;
+      margin-top: 100px;
+    }
+
+    .cover .team-block,
+    .cover .date-block {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .cover .date-block {
+      text-align: right;
+    }
+
+    .cover .label {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.65);
+      letter-spacing: 0.35em;
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+
+    .cover .names {
+      font-size: 24px;
+      color: #fff;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+    }
+
+    .cover .date-val {
+      font-family: var(--font-mono);
+      font-size: 24px;
+      color: #fff;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .cover .page-num,
+    .cover .brand-mark {
+      color: rgba(255, 255, 255, 0.55);
+    }
+
+    /* ============================================================
+     SLIDE 2 — PROBLEM (PDF page-2 replica)
+     ============================================================ */
+    .problem-grid {
+      display: grid;
+      grid-template-columns: 1fr 1.1fr;
+      gap: 28px;
+      flex: 1;
+      min-height: 0;
+    }
+
+    .problem-left {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      min-width: 0;
+    }
+
+    .problem-card {
+      padding: 30px 34px 30px 38px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      flex: 1;
+      min-width: 0;
+      border-radius: 16px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--accent);
+      box-shadow: var(--shadow-card);
+    }
+
+    .problem-card .pc-head {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+    }
+
+    .problem-card .card-num {
+      background: var(--accent) !important;
+    }
+
+    .problem-card h3 {
+      font-size: 27px;
+      font-weight: 800;
+      color: var(--text);
+      margin: 0;
+      letter-spacing: -0.02em;
+      line-height: 1.2;
+    }
+
+    .problem-card .pc-body {
+      margin: 0;
+      font-size: 19px;
+      color: var(--text-dim);
+      line-height: 1.6;
+      word-break: keep-all;
+      overflow-wrap: break-word;
+    }
+
+    .problem-card .pc-body .em {
+      color: var(--accent-dark);
+      font-weight: 700;
+    }
+
+    .problem-right {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      min-width: 0;
+      min-height: 0;
+    }
+
+    .news-big {
+      flex: 1;
+      min-height: 0;
+      border: 1px solid var(--border-strong);
+      border-radius: 18px;
+      overflow: hidden;
+      background: #fff;
+      box-shadow: var(--shadow-strong);
+      position: relative;
+    }
+
+    .news-big img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      object-position: center;
+      display: block;
+      background: #fff;
+    }
+
+    .news-big .news-tag {
+      position: absolute;
+      top: 18px;
+      left: 18px;
+      padding: 6px 14px;
+      background: var(--accent);
+      color: #fff;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 0.25em;
+      font-weight: 800;
+      border-radius: 999px;
+      text-transform: uppercase;
+      box-shadow: 0 2px 8px rgba(59, 130, 246, 0.35);
+      z-index: 2;
+    }
+
+    .news-quote-bar {
+      padding: 22px 28px;
+      border: 1px solid var(--accent-line);
+      background: linear-gradient(135deg, var(--accent-soft) 0%, #fff 90%);
+      border-radius: 14px;
+      box-shadow: var(--shadow-card);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .news-quote-bar .quote {
+      font-size: 19px;
+      font-weight: 800;
+      color: var(--accent-dark);
+      line-height: 1.4;
+      letter-spacing: -0.01em;
+    }
+
+    .news-quote-bar .cite {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-mute);
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      font-weight: 700;
+    }
+
+    /* ============================================================
+     SLIDE 3 — 6 FEATURE CARDS
+     ============================================================ */
+    .grid-3x2 {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      grid-template-rows: repeat(2, 1fr);
+      gap: 24px;
+      flex: 1;
+    }
+
+    .grid-2x1 {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 24px;
+      flex: 1;
+    }
+
+    .feature-card {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      padding: 32px 28px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      box-shadow: var(--shadow-card);
+      position: relative;
+    }
+
+    .feature-card .fc-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .feature-card .tag {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--accent);
+      background: var(--accent-soft);
+      padding: 4px 10px;
+      border-radius: 999px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      font-weight: 700;
+    }
+
+    .feature-card h3 {
+      font-size: 23px;
+      font-weight: 800;
+      color: var(--text);
+      letter-spacing: -0.015em;
+      margin: 0;
+      line-height: 1.25;
+    }
+
+    .feature-card p {
+      margin: 0;
+      color: var(--text-dim);
+      font-size: 16px;
+      line-height: 1.55;
+    }
+
+    .feature-card .metric {
+      padding: 18px 20px;
+      background: linear-gradient(135deg, var(--accent-soft) 0%, rgba(219, 234, 254, 0.3) 100%);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      border: 1px solid var(--accent-line);
+    }
+
+    .feature-card .metric .val {
+      font-family: var(--font-mono);
+      font-size: 30px;
+      font-weight: 800;
+      color: var(--accent-dark);
+      letter-spacing: -0.02em;
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .feature-card .metric .label {
+      font-size: 13px;
+      color: var(--text-dim);
+      font-weight: 600;
+      letter-spacing: 0.01em;
+      line-height: 1.4;
+    }
+
+    .feature-card .foot {
+      margin-top: auto;
+      padding-top: 14px;
+      border-top: 1px solid var(--border);
+      font-size: 12px;
+      color: var(--text-mute);
+      font-family: var(--font-mono);
+      letter-spacing: 0.1em;
+    }
+
+    /* ============================================================
+     SLIDE 4 — 4-LAYER ARCHITECTURE
+     ============================================================ */
+    .layer-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      flex: 1;
+    }
+
+    .layer-row {
+      display: grid;
+      grid-template-columns: 56px 200px 1fr auto;
+      align-items: center;
+      gap: 32px;
+      padding: 24px 32px;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background: var(--bg);
+      box-shadow: var(--shadow-card);
+    }
+
+    .layer-row.l4 {
+      border-color: var(--warning-line);
+      background: var(--warning-soft);
+    }
+
+    .layer-row .l-name {
+      font-size: 28px;
+      font-weight: 800;
+      color: var(--text);
+      letter-spacing: -0.02em;
+    }
+
+    .layer-row .l-desc {
+      font-size: 18px;
+      color: var(--text-dim);
+      line-height: 1.45;
+    }
+
+    .layer-row .l-desc .em {
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    /* ============================================================
+     SLIDE 5 — 3 STACK
+     ============================================================ */
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+      flex: 1;
+    }
+
+    .stack-card {
+      display: flex;
+      flex-direction: column;
+      gap: 22px;
+      padding: 36px 32px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      box-shadow: var(--shadow-card);
+    }
+
+    .stack-card .stack-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .stack-card h3 {
+      font-size: 26px;
+      font-weight: 800;
+      margin: 0;
+      letter-spacing: -0.015em;
+      color: var(--text);
+    }
+
+    .stack-card ul {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .stack-card li {
+      font-size: 16px;
+      line-height: 1.45;
+      color: var(--text-dim);
+      padding: 12px 0;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+    }
+
+    .stack-card li:last-child {
+      border-bottom: none;
+    }
+
+    .stack-card li::before {
+      content: '';
+      width: 5px;
+      height: 5px;
+      background: var(--accent);
+      border-radius: 50%;
+      margin-top: 8px;
+      flex-shrink: 0;
+    }
+
+    .stack-card .ident {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-dim);
+      letter-spacing: 0.04em;
+      padding: 14px 18px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      line-height: 1.65;
+    }
+
+    .stack-card .ident .k {
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    /* ============================================================
+     SLIDE 6 — SECURITY MODEL
+     ============================================================ */
+    .sec-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 28px;
+      flex: 1;
+    }
+
+    .sec-col {
+      padding: 36px 32px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      box-shadow: var(--shadow-card);
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      min-width: 0;
+      overflow: hidden;
+    }
+
+    .sec-col .head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .sec-col h3 {
+      font-size: 24px;
+      font-weight: 800;
+      color: var(--text);
+      letter-spacing: -0.015em;
+      margin: 0;
+    }
+
+    .sec-col .funcs {
+      font-family: var(--font-mono);
+      font-size: 14px;
+      color: var(--text-dim);
+      padding: 16px 20px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      line-height: 1.75;
+      word-break: break-all;
+      overflow-wrap: anywhere;
+    }
+
+    .sec-col .funcs .fn {
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    .sec-col .gate {
+      font-size: 17px;
+      color: var(--text-dim);
+      line-height: 1.55;
+    }
+
+    .sec-col .gate .em {
+      color: var(--accent);
+      font-weight: 700;
+    }
+
+    .sec-col ol {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      counter-reset: secstep;
+    }
+
+    .sec-col ol li {
+      counter-increment: secstep;
+      position: relative;
+      padding: 14px 0 14px 42px;
+      border-bottom: 1px solid var(--border);
+      font-size: 16px;
+      color: var(--text-dim);
+      line-height: 1.5;
+      word-break: keep-all;
+      overflow-wrap: break-word;
+    }
+
+    .sec-col ol li:last-child {
+      border-bottom: none;
+    }
+
+    .sec-col ol li::before {
+      content: counter(secstep, decimal-leading-zero);
+      position: absolute;
+      left: 0;
+      top: 14px;
+      width: 28px;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      color: var(--accent);
+      font-weight: 700;
+      letter-spacing: 0.06em;
+    }
+
+    .sec-col ol li .em {
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    .sec-honest {
+      margin-top: 22px;
+      padding: 22px 28px;
+      border: 1px solid var(--warning-line);
+      background: var(--warning-soft);
+      border-radius: 14px;
+      font-size: 17px;
+      color: #78350f;
+      line-height: 1.5;
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .sec-honest .tag {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: #fff;
+      background: var(--warning);
+      letter-spacing: 0.22em;
+      font-weight: 800;
+      padding: 6px 12px;
+      border-radius: 6px;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .sec-honest .em {
+      color: var(--text);
+      font-weight: 700;
+    }
+
+    /* ============================================================
+     SLIDE 7 — INTEGRITY 4 STATES + CAPTURES
+     ============================================================ */
+    .integrity-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 22px;
+      flex: 1;
+    }
+
+    .state-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+    }
+
+    .state-chip {
+      padding: 18px 22px;
+      border: 1px solid var(--border-strong);
+      border-radius: 12px;
+      background: var(--bg);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .state-chip.success {
+      border-color: var(--success-line);
+      background: var(--success-soft);
+    }
+
+    .state-chip.danger {
+      border-color: var(--danger-line);
+      background: var(--danger-soft);
+    }
+
+    .state-chip.warning {
+      border-color: var(--warning-line);
+      background: var(--warning-soft);
+    }
+
+    .state-chip .key {
+      font-family: var(--font-mono);
+      font-weight: 800;
+      font-size: 16px;
+      letter-spacing: 0.06em;
+    }
+
+    .state-chip.success .key {
+      color: #065f46;
+    }
+
+    .state-chip.danger .key {
+      color: #991b1b;
+    }
+
+    .state-chip.warning .key {
+      color: #92400e;
+    }
+
+    .state-chip .desc {
+      color: var(--text-dim);
+      font-size: 13px;
+      line-height: 1.4;
+    }
+
+    .cap-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      flex: 1;
+    }
+
+    .cap-card {
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      overflow: hidden;
+      background: var(--bg);
+      box-shadow: var(--shadow-card);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .cap-card.success {
+      border-color: var(--success-line);
+    }
+
+    .cap-card.danger {
+      border-color: var(--danger-line);
+    }
+
+    .cap-card.warning {
+      border-color: var(--warning-line);
+    }
+
+    .cap-card .cap-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 18px;
+      border-bottom: 1px solid var(--border);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-mute);
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+    }
+
+    .cap-card .cap-state {
+      font-weight: 800;
+      letter-spacing: 0.1em;
+    }
+
+    .cap-card.success .cap-state {
+      color: #065f46;
+    }
+
+    .cap-card.danger .cap-state {
+      color: #991b1b;
+    }
+
+    .cap-card.warning .cap-state {
+      color: #92400e;
+    }
+
+    .cap-card .cap-img-wrap {
+      flex: 1;
+      background: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    .cap-card .cap-img-wrap img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      object-position: center top;
+    }
+
+    /* ============================================================
+     SLIDE 8 — SEPOLIA DEPLOYMENT
+     ============================================================ */
+    .sepolia-wrap {
+      display: grid;
+      grid-template-columns: 1.05fr 0.95fr;
+      gap: 36px;
+      flex: 1;
+    }
+
+    .sepolia-left {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    .sepolia-left .label {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-mute);
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      font-weight: 700;
+    }
+
+    .addr-block {
+      padding: 32px 36px;
+      border: 1px solid var(--accent-line);
+      border-radius: 16px;
+      background: linear-gradient(180deg, var(--accent-soft), #fff);
+      box-shadow: var(--shadow-card);
+    }
+
+    .addr-block .addr-label {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--accent-dark);
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      font-weight: 700;
+      margin-bottom: 14px;
+    }
+
+    .addr-block .addr {
+      font-family: var(--font-mono);
+      font-size: 26px;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: -0.005em;
+      word-break: break-all;
+      line-height: 1.35;
+    }
+
+    .addr-block .addr .accent {
+      color: var(--accent);
+    }
+
+    .sepolia-meta {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    .sepolia-meta .meta-card {
+      padding: 20px 24px;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: var(--bg);
+      box-shadow: var(--shadow-card);
+    }
+
+    .sepolia-meta .meta-card .k {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-mute);
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+      font-weight: 700;
+      margin-bottom: 10px;
+    }
+
+    .sepolia-meta .meta-card .v {
+      font-size: 22px;
+      color: var(--text);
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+
+    .sepolia-meta .meta-card .v .mono {
+      font-family: var(--font-mono);
+      font-weight: 600;
+    }
+
+    .verify-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .vbadge {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 16px;
+      border: 1px solid var(--success-line);
+      background: var(--success-soft);
+      border-radius: 999px;
+      font-size: 13px;
+      color: #065f46;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+    }
+
+    .vbadge.muted {
+      border-color: var(--border);
+      background: var(--surface);
+      color: var(--text-mute);
+    }
+
+    .vbadge .ck {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: var(--success);
+      color: #fff;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 800;
+      flex-shrink: 0;
+    }
+
+    .vbadge.muted .ck {
+      background: var(--text-mute);
+    }
+
+    .sepolia-right {
+      border: 1px solid var(--border-strong);
+      border-radius: 16px;
+      overflow: hidden;
+      background: var(--bg);
+      box-shadow: var(--shadow-strong);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .sepolia-right .cap-head {
+      padding: 14px 22px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-mute);
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+    }
+
+    .sepolia-right .cap-head .live {
+      color: var(--success);
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .sepolia-right .cap-head .live .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--success);
+      box-shadow: 0 0 6px var(--success);
+    }
+
+    .sepolia-right .cap-img {
+      flex: 1;
+      background: #fff;
+      overflow: hidden;
+    }
+
+    .sepolia-right .cap-img img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center top;
+    }
+
+    /* SLIDE 8 v2 — screenshot-dominant simple layout */
+    .sepolia-v2 {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+      flex: 1;
+      min-height: 0;
+    }
+
+    .sepolia-v2 .addr-pill {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      padding: 18px 28px;
+      background: linear-gradient(135deg, var(--accent-soft) 0%, #fff 80%);
+      border: 1px solid var(--accent-line);
+      border-radius: 14px;
+      box-shadow: var(--shadow-card);
+    }
+
+    .sepolia-v2 .addr-pill .label {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--accent-dark);
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      font-weight: 800;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .sepolia-v2 .addr-pill .value {
+      font-family: var(--font-mono);
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: -0.005em;
+      word-break: break-all;
+      flex: 1;
+    }
+
+    .sepolia-v2 .addr-pill .value .accent {
+      color: var(--accent);
+    }
+
+    .sepolia-v2 .addr-pill .meta {
+      display: flex;
+      gap: 18px;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      color: var(--text-dim);
+      letter-spacing: 0.1em;
+      flex-shrink: 0;
+    }
+
+    .sepolia-v2 .addr-pill .meta .chip {
+      padding: 6px 12px;
+      background: #fff;
+      border: 1px solid var(--accent-line);
+      border-radius: 999px;
+      color: var(--accent-dark);
+      font-weight: 700;
+    }
+
+    .sepolia-v2 .shot {
+      flex: 1;
+      min-height: 0;
+      border: 1px solid var(--border-strong);
+      border-radius: 16px;
+      overflow: hidden;
+      background: #fff;
+      box-shadow: var(--shadow-strong);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .sepolia-v2 .shot .shot-head {
+      padding: 12px 22px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-mute);
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      flex-shrink: 0;
+    }
+
+    .sepolia-v2 .shot .shot-head .live {
+      color: var(--success);
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .sepolia-v2 .shot .shot-head .live .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--success);
+      box-shadow: 0 0 6px var(--success);
+    }
+
+    .sepolia-v2 .shot .shot-img {
+      flex: 1;
+      min-height: 0;
+      background: #fff;
+      overflow: hidden;
+      display: flex;
+    }
+
+    .sepolia-v2 .shot .shot-img img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      object-position: center;
+    }
+
+    .sepolia-v2 .caption {
+      font-size: 17px;
+      color: var(--text-dim);
+      line-height: 1.5;
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      flex-shrink: 0;
+    }
+
+    .sepolia-v2 .caption .em {
+      color: var(--text);
+      font-weight: 700;
+    }
+
+    .sepolia-v2 .caption .verify-mini {
+      display: flex;
+      gap: 10px;
+      margin-left: auto;
+      flex-shrink: 0;
+    }
+
+    .sepolia-v2 .caption .verify-mini .vb {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: 999px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      border: 1px solid var(--success-line);
+      background: var(--success-soft);
+      color: #065f46;
+    }
+
+    .sepolia-v2 .caption .verify-mini .vb .ck {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--success);
+      color: #fff;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 9px;
+      font-weight: 800;
+    }
+
+    /* ============================================================
+     SLIDE 9 — TEAM (4 horizontal cards)
+     ============================================================ */
+    .team-grid-h {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 22px;
+      flex: 1;
+    }
+
+    .team-card {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      padding: 36px 28px;
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      background: var(--bg);
+      box-shadow: var(--shadow-card);
+      position: relative;
+    }
+
+    .team-card .role-label {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--accent);
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      font-weight: 700;
+    }
+
+    .team-card .name {
+      font-size: 40px;
+      font-weight: 800;
+      color: var(--text);
+      letter-spacing: -0.025em;
+      line-height: 1;
+      margin: 0;
+    }
+
+    .team-card .work-list {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      flex: 1;
+      justify-content: center;
+    }
+
+    .team-card .work-list li {
+      font-size: 15px;
+      color: var(--text-dim);
+      line-height: 1.55;
+      padding-left: 24px;
+      position: relative;
+      word-break: keep-all;
+      overflow-wrap: break-word;
+    }
+
+    .team-card .work-list li::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 7px;
+      width: 8px;
+      height: 8px;
+      background: var(--accent-soft);
+      border: 1.5px solid var(--accent);
+      border-radius: 50%;
+    }
+
+    .team-card .work-list li .em {
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    .team-card .stack {
+      padding-top: 18px;
+      border-top: 1px solid var(--border);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-mute);
+      letter-spacing: 0.08em;
+      line-height: 1.55;
+    }
+
+    /* ============================================================
+     SLIDE 10 — DEMO + CLOSING
+     ============================================================ */
+    .demo {
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      background:
+        radial-gradient(ellipse 1000px 600px at 50% 40%, var(--accent-soft), transparent 70%),
+        var(--bg);
+    }
+
+    .demo .label-top {
+      font-family: var(--font-mono);
+      font-size: 14px;
+      letter-spacing: 0.4em;
+      color: var(--accent);
+      text-transform: uppercase;
+      font-weight: 700;
+      margin-bottom: 28px;
+    }
+
+    .demo .demo-title {
+      font-size: 200px;
+      font-weight: 800;
+      letter-spacing: -0.05em;
+      line-height: 1;
+      margin: 0;
+      color: var(--accent-dark);
+    }
+
+    .demo .demo-sub {
+      margin-top: 28px;
+      font-size: 26px;
+      color: var(--text-dim);
+      font-weight: 500;
+      letter-spacing: -0.005em;
+    }
+
+    .demo .video-frame {
+      margin-top: 48px;
+      width: 1200px;
+      aspect-ratio: 16 / 9;
+      border: 1px solid var(--border-strong);
+      border-radius: 18px;
+      background:
+        linear-gradient(180deg, var(--surface), #fff);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      box-shadow: var(--shadow-strong);
+    }
+
+    .demo .video-frame::before,
+    .demo .video-frame::after {
+      content: '';
+      position: absolute;
+      width: 28px;
+      height: 28px;
+      border: 2px solid var(--accent);
+    }
+
+    .demo .video-frame::before {
+      top: -1px;
+      left: -1px;
+      border-right: none;
+      border-bottom: none;
+    }
+
+    .demo .video-frame::after {
+      bottom: -1px;
+      right: -1px;
+      border-left: none;
+      border-top: none;
+    }
+
+    .demo .video-frame .placeholder {
+      font-family: var(--font-mono);
+      font-size: 16px;
+      letter-spacing: 0.35em;
+      color: var(--text-mute);
+      text-transform: uppercase;
+      font-weight: 600;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .demo .video-frame .play-icon {
+      width: 64px;
+      height: 64px;
+      border: 2px solid var(--accent);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--accent-soft);
+    }
+
+    .demo .video-frame .play-icon::after {
+      content: '';
+      border: 10px solid transparent;
+      border-left: 16px solid var(--accent);
+      margin-left: 4px;
+    }
+
+    .demo .closing {
+      margin-top: 56px;
+      font-size: 22px;
+      color: var(--text-dim);
+      line-height: 1.6;
+      max-width: 1100px;
+    }
+
+    .demo .closing .em {
+      color: var(--text);
+      font-weight: 700;
+    }
+
+    .demo .thanks {
+      margin-top: 24px;
+      font-family: var(--font-mono);
+      font-size: 14px;
+      color: var(--accent);
+      letter-spacing: 0.4em;
+      text-transform: uppercase;
+      font-weight: 700;
+    }
+
+    /* ============================================================
+     APPENDIX (Q&A) shared
+     ============================================================ */
+    .qa-question {
+      display: grid;
+      grid-template-columns: 80px 1fr;
+      gap: 24px;
+      align-items: start;
+      padding: 28px 32px;
+      background: var(--accent-soft);
+      border: 1px solid var(--accent-line);
+      border-radius: 16px;
+      margin-bottom: 28px;
+    }
+
+    .qa-question .q-tag {
+      font-family: var(--font-mono);
+      font-size: 40px;
+      font-weight: 800;
+      color: var(--accent-dark);
+      line-height: 1;
+      letter-spacing: -0.02em;
+    }
+
+    .qa-question .q-body {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--text);
+      line-height: 1.45;
+      letter-spacing: -0.01em;
+    }
+
+    .qa-question .q-body .em {
+      color: var(--accent-dark);
+      font-weight: 800;
+    }
+
+    .qa-grid-3 {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 22px;
+      flex: 1;
+    }
+
+    .qa-grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      flex: 1;
+    }
+
+    .qa-split {
+      display: grid;
+      grid-template-columns: 1.05fr 1fr;
+      gap: 26px;
+      flex: 1;
+    }
+
+    .qa-card {
+      padding: 32px 28px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      box-shadow: var(--shadow-card);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      min-width: 0;
+      overflow: hidden;
+    }
+
+    .qa-card.highlight {
+      background: linear-gradient(180deg, var(--accent-soft), #fff);
+      border-color: var(--accent-line);
+      box-shadow: var(--shadow-strong);
+    }
+
+    .qa-card .qa-label {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 0.25em;
+      color: var(--text-mute);
+      text-transform: uppercase;
+      font-weight: 800;
+    }
+
+    .qa-card .qa-label.accent {
+      color: var(--accent);
+    }
+
+    .qa-card .qa-label.warning {
+      color: var(--warning);
+    }
+
+    .qa-card .qa-title {
+      font-size: 22px;
+      font-weight: 800;
+      color: var(--text);
+      letter-spacing: -0.015em;
+      line-height: 1.25;
+    }
+
+    .qa-card .qa-title .ok {
+      color: var(--success);
+      margin: 0 4px;
+    }
+
+    .qa-card .qa-title .ng {
+      color: var(--danger);
+      margin: 0 4px;
+    }
+
+    .qa-card p {
+      margin: 0;
+      font-size: 16px;
+      color: var(--text-dim);
+      line-height: 1.6;
+    }
+
+    .qa-card p .em {
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    .qa-card .qa-meta {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-dim);
+      padding: 12px 14px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      line-height: 1.5;
+    }
+
+    .qa-card .qa-list {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      counter-reset: qastep;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .qa-card .qa-list li {
+      counter-increment: qastep;
+      position: relative;
+      padding: 12px 0 12px 34px;
+      border-bottom: 1px solid var(--border);
+      font-size: 15px;
+      color: var(--text-dim);
+      line-height: 1.5;
+      word-break: keep-all;
+      overflow-wrap: break-word;
+    }
+
+    .qa-card .qa-list li:last-child {
+      border-bottom: none;
+    }
+
+    .qa-card .qa-list li::before {
+      content: counter(qastep, decimal-leading-zero);
+      position: absolute;
+      left: 0;
+      top: 12px;
+      width: 24px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--accent);
+      font-weight: 800;
+      letter-spacing: 0.06em;
+    }
+
+    .qa-card .qa-list li .em {
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    .qr-code {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      color: var(--text-dim);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 18px 22px;
+      line-height: 1.6;
+      white-space: pre;
+      overflow: hidden;
+    }
+
+    .qr-code .key {
+      color: var(--accent);
+    }
+
+    /* ===== Print =====
+     Chrome PDF 저장 시 권장 설정:
+     - 대상: PDF로 저장
+     - 용지: "1920x1080" 또는 "맞춤" (없으면 그대로 두고 "배경 그래픽" ON)
+     - 여백: 없음
+     - 배율: 기본값 (Default)  → 1920x1080을 직접 인쇄
+  */
+    @page {
+      size: 1920px 1080px;
+      margin: 0;
+    }
+
+    @media print {
+
+      html,
+      body {
+        width: 1920px !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        background: var(--bg) !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+
+      body {
+        display: block !important;
+        transform: none !important;
+        gap: 0 !important;
+      }
+
+      .slide {
+        width: 1920px !important;
+        height: 1080px !important;
+        margin: 0 !important;
+        box-shadow: none !important;
+        page-break-after: always !important;
+        break-after: page !important;
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+      }
+
+      .slide:last-child {
+        page-break-after: auto !important;
+      }
+    }
+
+    /* ===== Screen viewport scale (auto-fit to monitor) =====
+     1920px 보다 좁은 화면에서 슬라이드 잘림 방지.
+     transform: scale 이 zoom 보다 Safari/Chrome 양쪽 안정적. */
+    @media screen and (max-width: 1920px) {
+      body {
+        transform: scale(calc(100vw / 1920));
+        transform-origin: top center;
+        width: 1920px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- ============================ SLIDE 1 — COVER ============================ -->
+  <section class="slide cover">
+    <div class="cover-top">
+      <span class="ptag">Presentation</span>
+      <span class="ptag-right">2026 · FINAL </span>
+    </div>
+
+    <div class="hero">
+      <span class="accent-line"></span>
+      <h1 class="title">블록체인 기반<br />NFT 바우처 시스템</h1>
+    </div>
+
+    <div class="cover-bottom">
+      <div class="team-block">
+        <span class="label">Team</span>
+        <span class="names">조익준 &nbsp;·&nbsp; 정재현 &nbsp;·&nbsp; 조 현 &nbsp;·&nbsp; 황종훈</span>
+      </div>
+    </div>
+
+    <span class="brand-mark">NFT Voucher</span>
+    <span class="page-num">01 / 10</span>
+  </section>
+
+
+  <!-- ============================ SLIDE 2 — PROBLEM (PDF page-2 replica) ============================ -->
+  <section class="slide">
+    <div class="slide-header">
+      <div class="left">
+        <span class="title-rail"></span>
+        <div class="title-block">
+          <span class="eyebrow">Problem</span>
+          <h2 class="section-title">기존 바우처 시스템의 문제점</h2>
+        </div>
+      </div>
+      <span class="num-large">02 / 10</span>
+    </div>
+
+    <div class="problem-grid">
+      <!-- Left: 3 problem cards -->
+      <div class="problem-left">
+        <div class="card problem-card warning">
+          <div class="pc-head">
+            <span class="card-num warning">01</span>
+            <h3>데이터 위변조 및 조작</h3>
+          </div>
+          <p class="pc-body">
+            중앙 서버(DB) 방식은 <span class="em">관리자·해커가 잔액 데이터를 임의로 조작</span>할 수 있고,
+            캡처된 결제 QR을 <span class="em">가로채 재사용(이중 결제)</span>하는 공격이 가능하다.
+          </p>
+        </div>
+
+        <div class="card problem-card danger">
+          <div class="pc-head">
+            <span class="card-num danger">02</span>
+            <h3>정산 분쟁 및 불법 양도</h3>
+          </div>
+          <p class="pc-body">
+            가맹점·정산 기관 간 <span class="em">결제액 데이터가 어긋나</span> 정산 분쟁이 잦고,
+            <span class="em">현금깡 등 불법 양도</span>로 지원금 본래 목적이 훼손된다.
+          </p>
+        </div>
+
+        <div class="card problem-card tech">
+          <div class="pc-head">
+            <span class="card-num">03</span>
+            <h3>블록체인의 가스비 허들</h3>
+          </div>
+          <p class="pc-body">
+            기존 블록체인 앱은 결제할 때마다 사용자가 <span class="em">이더리움 가스비를 직접 부담</span>해야 했다.
+            실생활 도입을 가로막던 결정적 장벽.
+          </p>
+        </div>
+      </div>
+
+      <!-- Right: big news capture + quote bar -->
+      <div class="problem-right">
+        <div class="news-big">
+          <img src="./captures/news-thumbnails.jpeg" alt="민생회복 소비쿠폰 부정유통 보도" />
+        </div>
+
+      </div>
+    </div>
+
+    <span class="brand-mark">Problem</span>
+    <span class="page-num">02 / 10</span>
+  </section>
+
+
+  <!-- ============================ SLIDE 3-1 — USER BLOCKCHAIN FEATURES ============================ -->
+  <section class="slide">
+    <div class="slide-header">
+      <div class="left">
+        <span class="title-rail"></span>
+        <div class="title-block">
+          <span class="eyebrow">Blockchain Utilization: User</span>
+          <h2 class="section-title">블록체인 활용 방안 (1) 사용자 (USER)</h2>
+        </div>
+      </div>
+      <span class="num-large">03-1 / 10</span>
+    </div>
+
+    <div class="grid-2x1">
+      <div class="feature-card">
+        <div class="fc-head">
+          <span class="card-num">01</span>
+          <span class="tag">ERC-721 NFT</span>
+        </div>
+        <h3>NFT 소유권 보장</h3>
+        <p>발급받은 바우처는 수혜자 개인 지갑에 NFT로 발행 및 소유됩니다. 타인 무단 양도 및 복제를 원천 차단하여 투명한 바우처 분배가 가능합니다.</p>
+        <div class="metric">
+          <span class="val">1 NFT</span>
+          <span class="label">수혜자 지갑 귀속<br />고유 소유권 확보</span>
+        </div>
+        <div class="foot">OpenZeppelin · ERC-721</div>
+      </div>
+
+      <div class="feature-card">
+        <div class="fc-head">
+          <span class="card-num">02</span>
+          <span class="tag">GASLESS UX</span>
+        </div>
+        <h3>EIP-712 메타-트랜잭션</h3>
+        <p>사용자는 가스비(수수료)를 지불할 필요가 없습니다. MetaMask 개인키 서명만으로 오프라인 가맹점에서 간편하게 잔액을 결제 및 차감합니다.</p>
+        <div class="metric">
+          <span class="val">0원</span>
+          <span class="label">사용자 수수료 부담 해소<br />서명 기반 대납 결제</span>
+        </div>
+        <div class="foot">Sponsored Transaction</div>
+      </div>
+    </div>
+
+    <span class="brand-mark">Why Blockchain (User)</span>
+    <span class="page-num">03-1 / 10</span>
+  </section>
+
+  <!-- ============================ SLIDE 3-2 — MERCHANT BLOCKCHAIN FEATURES ============================ -->
+  <section class="slide">
+    <div class="slide-header">
+      <div class="left">
+        <span class="title-rail"></span>
+        <div class="title-block">
+          <span class="eyebrow">Blockchain Utilization: Merchant</span>
+          <h2 class="section-title">블록체인 활용 방안 (2) 가맹점 (MERCHANT)</h2>
+        </div>
+      </div>
+      <span class="num-large">03-2 / 10</span>
+    </div>
+
+    <div class="grid-2x1">
+      <div class="feature-card">
+        <div class="fc-head">
+          <span class="card-num">03</span>
+          <span class="tag">ACCESS CONTROL</span>
+        </div>
+        <h3>가맹점 화이트리스트</h3>
+        <p>스마트 컨트랙트가 등록 및 승인된 가맹점 지갑만 결제를 허용합니다. <span class="code-inline">approveMerchant()</span> 기능을 통해 비승인 가맹점의 불법 바우처 결제를 원천 차단합니다.</p>
+        <div class="metric">
+          <span class="val">On-chain</span>
+          <span class="label">사전 승인된 가맹점만<br />결제 트랜잭션 수락</span>
+        </div>
+        <div class="foot">On-chain Whitelist</div>
+      </div>
+
+      <div class="feature-card">
+        <div class="fc-head">
+          <span class="card-num">05</span>
+          <span class="tag">KECCAK256</span>
+        </div>
+        <h3>metadataHash 무결성</h3>
+        <p>결제 정보를 canonical JSON으로 직렬화 → keccak256 → 온체인 영구 저장. 사후 RDB 조작을 탐지.</p>
+        <div class="metric">
+          <span class="val">32 byte</span>
+          <span class="label">결제 지문<br />온체인 영구 저장</span>
+        </div>
+        <div class="foot">Tamper-evident</div>
+      </div>
+
+      <div class="feature-card">
+        <div class="fc-head">
+          <span class="card-num">06</span>
+          <span class="tag">ELIGIBILITY</span>
+        </div>
+        <h3>자격 자동 매칭</h3>
+        <p>나이·지역 조건을 백엔드가 자동 검증. 미달 사용자는 신청 단계에서 거절 — 부정 발급 차단.</p>
+        <div class="metric">
+          <span class="val">auto</span>
+          <span class="label">나이·지역 조건<br />발급 단계 즉시 차단</span>
+        </div>
+        <div class="foot">Auto-matching</div>
+      </div>
+    </div>
+
+    <span class="brand-mark">Why Blockchain</span>
+    <span class="page-num">03 / 10</span>
+  </section>
+
+
+  <!-- ============================ SLIDE 4 — 4-LAYER ARCHITECTURE ============================ -->
+  <section class="slide">
+    <div class="slide-header">
+      <div class="left">
+        <span class="title-rail"></span>
+        <div class="title-block">
+          <span class="eyebrow">Architecture</span>
+          <h2 class="section-title">시스템 아키텍처 — 4 Layer</h2>
+        </div>
+      </div>
+      <span class="num-large">04 / 10</span>
+    </div>
+
+    <div class="layer-stack">
+      <div class="layer-row">
+        <span class="card-num">L1</span>
+        <span class="l-name">Frontend</span>
+        <span class="l-desc"><span class="em">React · TypeScript · Tailwind</span> · MetaMask 지갑 연동 — 사용자 / 가맹점 / 관리자
+          3역할 DApp UI</span>
+        <span class="badge accent"><span class="dot"></span>구현 완료</span>
+      </div>
+
+      <div class="layer-row">
+        <span class="card-num">L2</span>
+        <span class="l-name">Backend</span>
+        <span class="l-desc"><span class="em">Spring Boot · Web3j · JPA · JWT</span> — 메타-트랜잭션 중계, 자격 매칭, PaymentSession
+          관리</span>
+        <span class="badge accent"><span class="dot"></span>구현 완료</span>
+      </div>
+
+      <div class="layer-row">
+        <span class="card-num">L3</span>
+        <span class="l-name">Blockchain</span>
+        <span class="l-desc"><span class="em">Solidity · ERC-721</span> · voucherValue[tokenId] 자체 잔액 · 4 이벤트 발행</span>
+        <span class="badge accent"><span class="dot"></span>구현 완료</span>
+      </div>
+
+      <div class="layer-row">
+        <span class="card-num">L4</span>
+        <span class="l-name">Verification</span>
+        <span class="l-desc"><span class="em">Event Scanner · Integrity Verifier</span> — 온체인 이벤트 폴링 후 DB·체인 hash 자동 대조
+          · 4상태 자동 판정</span>
+        <span class="badge accent"><span class="dot"></span>구현 완료</span>
+      </div>
+    </div>
+
+    <div class="impact-quote" style="margin-top: 28px;">
+      <strong>핵심 원칙</strong> &nbsp;—&nbsp; RDB는 조작이 가능하지만, 온체인 <span class="accent">metadataHash</span>와 비교하면 조작이 들킨다.
+    </div>
+
+    <span class="brand-mark">Architecture</span>
+    <span class="page-num">04 / 10</span>
+  </section>
+
+
+  <!-- ============================ SLIDE 5 — 3 STACK SCOPE ============================ -->
+  <section class="slide">
+    <div class="slide-header">
+      <div class="left">
+        <span class="title-rail"></span>
+        <div class="title-block">
+          <span class="eyebrow">Scope</span>
+          <h2 class="section-title">구현 범위 — 3 Stack</h2>
+        </div>
+      </div>
+      <span class="num-large">05 / 10</span>
+    </div>
+
+    <div class="grid-3">
+      <div class="stack-card">
+        <div class="stack-head">
+          <h3>Frontend</h3>
+          <span class="badge accent"><span class="dot"></span>구현 완료</span>
+        </div>
+        <ul>
+          <li>사용자 / 가맹점 / 관리자 3역할 UI</li>
+          <li>MetaMask 지갑 연동 및 네트워크 가드</li>
+          <li>EIP-712 서명 — useVoucher 메시지</li>
+          <li>QR 생성 / 카메라 스캔 양방향</li>
+          <li>자격 매칭 UX — 미달 사유 명시</li>
+          <li>JWT 기반 axios 인터셉터 · 401 자동 처리</li>
+        </ul>
+        <div class="ident"><span class="k">React 18</span> · TypeScript 4.9<br /><span class="k">Tailwind 3</span> ·
+          Web3.js</div>
+      </div>
+
+      <div class="stack-card">
+        <div class="stack-head">
+          <h3>Backend</h3>
+          <span class="badge accent"><span class="dot"></span>구현 완료</span>
+        </div>
+        <ul>
+          <li>JWT 인증 — 지갑 서명 nonce / verify 흐름</li>
+          <li>메타-트랜잭션 중계 — 컨트랙트 호출 대행</li>
+          <li>자격 매칭 — 나이·지역 조건 검증</li>
+          <li>PaymentSession 관리 · 10분 만료 처리</li>
+          <li>metadataHash 생성 — canonical JSON keccak256</li>
+          <li>Web3j 기반 컨트랙트 호출 및 영수 처리</li>
+        </ul>
+        <div class="ident"><span class="k">Spring Boot 2.7</span> · Java 11<br /><span class="k">JPA · Web3j</span> ·
+          MySQL</div>
+      </div>
+
+      <div class="stack-card">
+        <div class="stack-head">
+          <h3>Smart Contract</h3>
+          <span class="badge accent"><span class="dot"></span>구현 완료</span>
+        </div>
+        <ul>
+          <li>ERC-721 + 자체 잔액 voucherValue[tokenId]</li>
+          <li>useVoucherByMerchant · EIP-712 서명 검증</li>
+          <li>가맹점 화이트리스트 — approveMerchant</li>
+          <li>recordCommitmentHash = metadataHash 저장</li>
+          <li>nonce 재사용 방지 + deadline 만료 검사</li>
+          <li>VoucherUsed 이벤트 — 결제 영구 기록</li>
+        </ul>
+        <div class="ident"><span class="k">Solidity 0.8.19</span><br /><span class="k">OpenZeppelin 4.8</span> · EIP-712
+        </div>
+      </div>
+    </div>
+
+    <span class="brand-mark">Scope</span>
+    <span class="page-num">05 / 10</span>
+  </section>
+
+
+  <!-- ============================ SLIDE 6 — SECURITY MODEL ============================ -->
+  <section class="slide">
+    <div class="slide-header">
+      <div class="left">
+        <span class="title-rail"></span>
+        <div class="title-block">
+          <span class="eyebrow">Security</span>
+          <h2 class="section-title">해커가 컨트랙트를 직접 호출하면?</h2>
+        </div>
+      </div>
+      <span class="num-large">06 / 10</span>
+    </div>
+
+    <div class="sec-grid">
+      <div class="sec-col">
+        <div class="head">
+          <h3>행정 함수</h3>
+          <span class="badge accent"><span class="dot"></span>onlyOwner</span>
+        </div>
+        <div class="funcs">
+          <span class="fn">createVoucherProgram(...)</span><br />
+          <span class="fn">mintVoucher(...)</span><br />
+          <span class="fn">approveMerchant(...)</span>
+        </div>
+        <div class="gate">단일 모디파이어 <span class="em">onlyOwner</span> — <span class="code-inline">msg.sender ==
+            owner</span> 만 통과한다.</div>
+        <ol>
+          <li><span class="em">컨트랙트 owner 키</span>를 모르면 호출 자체 불가능</li>
+          <li>owner 키는 백엔드 지갑이 단독 보관한다</li>
+          <li>모든 행정 액션은 단일 owner 책임으로 귀속된다</li>
+        </ol>
+      </div>
+
+      <div class="sec-col">
+        <div class="head">
+          <h3>결제 함수</h3>
+          <span class="badge accent"><span class="dot"></span>4중 검증</span>
+        </div>
+        <div class="funcs">
+          <span class="fn">useVoucherByMerchant(tokenId, amount, sig, ...)</span>
+        </div>
+        <div class="gate"><span class="em">4중 검증</span> — 네 단계 중 어느 하나라도 실패하면 트랜잭션 revert.</div>
+        <ol>
+          <li><span class="em">msg.sender</span>가 가맹점 화이트리스트에 있는가</li>
+          <li><span class="em">EIP-712 서명</span>이 토큰 owner 서명과 일치하는가</li>
+          <li><span class="em">nonce</span>가 사용 전 상태인가 (재사용 방지)</li>
+          <li><span class="em">deadline</span>이 만료되지 않았는가</li>
+        </ol>
+      </div>
+    </div>
+
+    <div class="sec-honest">
+      <span class="tag">전제 조건</span>
+      <span><span class="em">owner 키는 백엔드 지갑이 단독 보관</span> — 외부 우회는 차단되며, 내부 키 보안이 시스템 신뢰의 기반이 된다.</span>
+    </div>
+
+    <span class="brand-mark">Security Model</span>
+    <span class="page-num">06 / 10</span>
+  </section>
+
+
+  <!-- ============================ SLIDE 7 — INTEGRITY 4 STATES + CAPTURES ============================ -->
+  <section class="slide">
+    <div class="slide-header">
+      <div class="left">
+        <span class="title-rail"></span>
+        <div class="title-block">
+          <span class="eyebrow">Integrity Verification</span>
+          <h2 class="section-title">무결성 검증 — 4가지 상태 자동 판정</h2>
+        </div>
+      </div>
+      <span class="num-large">07 / 10</span>
+    </div>
+
+    <div class="integrity-wrap">
+      <div class="state-row">
+        <div class="state-chip success">
+          <div class="key">VERIFIED</div>
+          <div class="desc">DB hash == 온체인 hash · 무결성 통과</div>
+        </div>
+        <div class="state-chip danger">
+          <div class="key">MISMATCH</div>
+          <div class="desc">hash 불일치 · RDB 사후 변경 의심</div>
+        </div>
+        <div class="state-chip warning">
+          <div class="key">MISSING_DB</div>
+          <div class="desc">온체인엔 있는데 DB 기록이 없음</div>
+        </div>
+        <div class="state-chip warning">
+          <div class="key">MISSING_ONCHAIN</div>
+          <div class="desc">DB엔 있는데 온체인 이벤트 없음</div>
+        </div>
+      </div>
+
+      <div class="cap-grid">
+        <div class="cap-card success">
+          <div class="cap-header">
+            <span>STATE · 01</span>
+            <span class="cap-state">VERIFIED</span>
+          </div>
+          <div class="cap-img-wrap">
+            <img src="./captures/verification-verified-after-payment.png" alt="결제 후 검증 통과" />
+          </div>
+        </div>
+
+        <div class="cap-card danger">
+          <div class="cap-header">
+            <span>STATE · 02</span>
+            <span class="cap-state">MISMATCH</span>
+          </div>
+          <div class="cap-img-wrap">
+            <img src="./captures/verification-mismatch.png" alt="위변조 탐지" />
+          </div>
+        </div>
+
+        <div class="cap-card warning">
+          <div class="cap-header">
+            <span>STATE · 03</span>
+            <span class="cap-state">MISSING_DB</span>
+          </div>
+          <div class="cap-img-wrap">
+            <img src="./captures/verification-missing-db.png" alt="DB 누락" />
+          </div>
+        </div>
+
+        <div class="cap-card warning">
+          <div class="cap-header">
+            <span>STATE · 04</span>
+            <span class="cap-state">MISSING_ONCHAIN</span>
+          </div>
+          <div class="cap-img-wrap">
+            <img src="./captures/verification-missing-onchain.png" alt="컨트랙트 누락" />
+          </div>
+        </div>
+      </div>
+
+      <div class="impact-quote">
+        결제 hash가 백엔드와 컨트랙트 양쪽에 동일하게 박힌다 — <strong>비교만으로 위변조 탐지</strong>.
+      </div>
+    </div>
+
+    <span class="brand-mark">Integrity Verification</span>
+    <span class="page-num">07 / 10</span>
+  </section>
+
+
+  <!-- ============================ SLIDE 8 — SEPOLIA DEPLOYMENT ============================ -->
+  <section class="slide">
+    <div class="slide-header">
+      <div class="left">
+        <span class="title-rail"></span>
+        <div class="title-block">
+          <span class="eyebrow">Public Deployment</span>
+          <h2 class="section-title">Sepolia 공개 테스트넷 배포</h2>
+        </div>
+      </div>
+      <span class="num-large">08 / 10</span>
+    </div>
+
+    <div class="sepolia-v2">
+      <div class="addr-pill">
+        <span class="label">Contract</span>
+        <span class="value"><span class="accent">0x</span>002E36f608C284C3f57308704b3ae99Fb1839bc7</span>
+        <span class="meta">
+          <span class="chip">Sepolia</span>
+          <span class="chip">Chain ID 11155111</span>
+        </span>
+      </div>
+
+      <div class="shot">
+        <div class="shot-head">
+          <span>sepolia.etherscan.io · Events</span>
+          <span class="live"><span class="dot"></span>LIVE</span>
+        </div>
+        <div class="shot-img">
+          <img src="./captures/sepolia-etherscan-events.png" alt="Sepolia Etherscan 이벤트 로그" />
+        </div>
+      </div>
+
+      <div class="caption">
+        <span><span class="em">실제 공개 테스트넷</span>에 배포 완료 — 누구나 트랜잭션·이벤트 로그·소스 코드를 직접 검증할 수 있다.</span>
+        <span class="verify-mini">
+          <span class="vb"><span class="ck">✓</span>Sourcify</span>
+          <span class="vb"><span class="ck">✓</span>Blockscout</span>
+        </span>
+      </div>
+    </div>
+
+    <span class="brand-mark">Sepolia Deployment</span>
+    <span class="page-num">08 / 10</span>
+  </section>
+
+
+  <!-- ============================ SLIDE 9 — TEAM (4 horizontal cards) ============================ -->
+  <section class="slide">
+    <div class="slide-header">
+      <div class="left">
+        <span class="title-rail"></span>
+        <div class="title-block">
+          <span class="eyebrow">Team</span>
+          <h2 class="section-title">팀원 소개 및 역할</h2>
+        </div>
+      </div>
+      <span class="num-large">09 / 10</span>
+    </div>
+
+    <div class="team-grid-h">
+      <div class="team-card">
+        <span class="card-num">01</span>
+        <div>
+          <div class="role-label">Frontend</div>
+          <div class="name">조익준</div>
+        </div>
+        <ul class="work-list">
+          <li><span class="em">DApp UI</span> 전체 설계 및 구현</li>
+          <li><span class="em">MetaMask</span> 지갑 연동 · 네트워크 가드</li>
+          <li><span class="em">EIP-712</span> 서명 UX · QR 생성·스캔</li>
+          <li>자격 매칭 UI · 검증 결과 표시 페이지</li>
+        </ul>
+        <div class="stack">React · TypeScript<br />Tailwind · Web3.js</div>
+      </div>
+
+      <div class="team-card">
+        <span class="card-num">02</span>
+        <div>
+          <div class="role-label">Backend</div>
+          <div class="name">정재현</div>
+        </div>
+        <ul class="work-list">
+          <li><span class="em">API 서버</span> 및 RDB 스키마 설계</li>
+          <li><span class="em">JWT 인증</span> · nonce/verify 흐름</li>
+          <li>metadata <span class="em">canonical JSON · keccak256</span></li>
+          <li>PaymentSession · 메타-트랜잭션 중계</li>
+        </ul>
+        <div class="stack">Spring Boot · JPA<br />Web3j · MySQL</div>
+      </div>
+
+      <div class="team-card">
+        <span class="card-num">03</span>
+        <div>
+          <div class="role-label">Solidity</div>
+          <div class="name">조 현</div>
+        </div>
+        <ul class="work-list">
+          <li>스마트 컨트랙트 전체 설계 및 구현</li>
+          <li><span class="em">ERC-721 Value Extension</span></li>
+          <li><span class="em">EIP-712</span> 서명 검증 (ecrecover)</li>
+          <li>Access Control · VoucherUsed 이벤트</li>
+        </ul>
+        <div class="stack">Solidity 0.8.19<br />OpenZeppelin · EIP-712</div>
+      </div>
+
+      <div class="team-card">
+        <span class="card-num">04</span>
+        <div>
+          <div class="role-label">Blockchain</div>
+          <div class="name">황종훈</div>
+        </div>
+        <ul class="work-list">
+          <li>블록체인 인프라 · 검증 레이어 설계</li>
+          <li><span class="em">Event Scanner</span> · Integrity Verifier</li>
+          <li><span class="em">Ganache · Sepolia</span> 배포 자동화</li>
+          <li>4상태 자동 판정 로직 (VERIFIED 등)</li>
+        </ul>
+        <div class="stack">Ganache · Truffle<br />Event Polling</div>
+      </div>
+    </div>
+
+    <span class="brand-mark">Team</span>
+    <span class="page-num">09 / 10</span>
+  </section>
+
+
+  <!-- ============================ SLIDE 10 — DEMO + CLOSING ============================ -->
+  <section class="slide demo">
+    <h1 class="demo-title">DEMO</h1>
+
+    <div class="video-frame">
+      <div class="placeholder">
+        <div class="play-icon"></div>
+        <span>Video · 16 : 9</span>
+      </div>
+    </div>
+
+    <div class="thanks">Thank You</div>
+
+    <span class="brand-mark">Demo · Closing</span>
+    <span class="page-num">10 / 10</span>
+  </section>
+
+
+  <!-- ============================ APPENDIX A1 — Q1 (ERC-721 EXTENSION) ============================ -->
+  <section class="slide">
+    <div class="slide-header">
+      <div class="left">
+        <span class="title-rail"></span>
+        <div class="title-block">
+          <span class="eyebrow">Appendix · Q&amp;A</span>
+          <h2 class="section-title">왜 ERC-721에 자체 잔액 확장인가</h2>
+        </div>
+      </div>
+      <span class="num-large">A1 / A3</span>
+    </div>
+
+    <div class="qa-question">
+      <span class="q-tag">Q1.</span>
+      <span class="q-body">ERC-721 위에 잔액 차감 기능을 직접 추가했는데, 왜 <span class="em">표준에서 벗어난 확장</span>을 선택했나요?</span>
+    </div>
+
+    <div class="qa-grid-3">
+      <div class="qa-card">
+        <div class="qa-label">ERC-20</div>
+        <div class="qa-title">잔액 <span class="ok">✓</span> 식별 <span class="ng">✗</span></div>
+        <p>마트 적립 포인트처럼 같은 단위 토큰. 누가 어떤 프로그램의 바우처를 받았는지 추적이 어렵다.</p>
+      </div>
+      <div class="qa-card">
+        <div class="qa-label">ERC-721 기본</div>
+        <div class="qa-title">식별 <span class="ok">✓</span> 잔액 <span class="ng">✗</span></div>
+        <p>인증서처럼 토큰별 고유. 그러나 잔액 차감 표준 함수가 없어 <span class="em">부분 결제 불가능</span>하다.</p>
+      </div>
+      <div class="qa-card highlight">
+        <div class="qa-label accent">우리 선택</div>
+        <div class="qa-title">식별 + 잔액 모두</div>
+        <p>ERC-721 + <span class="code-inline">voucherValue[tokenId]</span> 매핑 자체 추가. <span
+            class="code-inline">VoucherUsed</span> 이벤트로 변경 발행.</p>
+      </div>
+    </div>
+
+    <div class="sec-honest" style="margin-top: 24px;">
+      <span class="tag">정직한 한계</span>
+      <span>표준 밖이라 외부 익스플로러 자동 인식 불가 → <span class="em">자체 Verification Layer</span>로 보완한다.</span>
+    </div>
+
+    <span class="brand-mark">Appendix · Q1</span>
+    <span class="page-num">A1 / A3</span>
+  </section>
+
+
+  <!-- ============================ APPENDIX A2 — Q2 (BYPASS PREVENTION) ============================ -->
+  <section class="slide">
+    <div class="slide-header">
+      <div class="left">
+        <span class="title-rail"></span>
+        <div class="title-block">
+          <span class="eyebrow">Appendix · Q&amp;A</span>
+          <h2 class="section-title">백엔드 우회로 자격 검증을 회피할 수 있나</h2>
+        </div>
+      </div>
+      <span class="num-large">A2 / A3</span>
+    </div>
+
+    <div class="qa-question">
+      <span class="q-tag">Q2.</span>
+      <span class="q-body">자격 검증을 백엔드에서만 수행한다면 해커가 컨트랙트를 <span class="em">직접 호출해 우회</span>할 수 있지 않나요?</span>
+    </div>
+
+    <div class="qa-grid-2">
+      <div class="qa-card">
+        <div class="qa-label accent">현재 방어</div>
+        <div class="qa-title">onlyOwner 모디파이어</div>
+        <p>외부 우회 시도는 행정 함수의 <span class="code-inline">onlyOwner</span>에서 <span class="em">차단</span>된다. <span
+            class="code-inline">msg.sender == owner</span>이 아니면 트랜잭션 revert.</p>
+        <div class="qa-meta">createVoucherProgram · mintVoucher · approveMerchant</div>
+      </div>
+      <div class="qa-card highlight">
+        <div class="qa-label accent">컨트랙트 레벨 검증</div>
+        <div class="qa-title">EIP-712 + ecrecover 패턴</div>
+        <p>결제 함수 <span class="code-inline">useVoucherByMerchant</span>에서는 사용자 EIP-712 서명을 <span
+            class="code-inline">ecrecover</span>로 직접 검증한다. 행정 함수 호출자는 <span class="code-inline">onlyOwner</span>로 백엔드
+          지갑만 허용한다.</p>
+      </div>
+    </div>
+
+    <div class="sec-honest" style="margin-top: 24px;">
+      <span class="tag">전제 조건</span>
+      <span>외부 우회는 <span class="em">onlyOwner + 4중 검증</span>으로 차단된다. 내부 owner 키 보안은 백엔드 운영 영역에 의존한다.</span>
+    </div>
+
+    <span class="brand-mark">Appendix · Q2</span>
+    <span class="page-num">A2 / A3</span>
+  </section>
+
+
+  <!-- ============================ APPENDIX A3 — Q3 (QR THEFT) ============================ -->
+  <section class="slide">
+    <div class="slide-header">
+      <div class="left">
+        <span class="title-rail"></span>
+        <div class="title-block">
+          <span class="eyebrow">Appendix · Q&amp;A</span>
+          <h2 class="section-title">사용자 QR이 캡쳐되면 도용 가능한가</h2>
+        </div>
+      </div>
+      <span class="num-large">A3 / A3</span>
+    </div>
+
+    <div class="qa-question">
+      <span class="q-tag">Q3.</span>
+      <span class="q-body">사용자 QR에는 어떤 정보가 담기며, <span class="em">캡쳐·도용</span> 시 결제가 일어날 수 있나요?</span>
+    </div>
+
+    <div class="qa-split">
+      <div class="qa-card">
+        <div class="qa-label">QR JSON 페이로드</div>
+        <div class="qr-code">{
+          "voucherId": 2,
+          "ownerWallet": "0xFFcf…09f0",
+          "ownerNickname": "김청년",
+          "onChainTokenId": 2,
+          "currentValue": 50000,
+          "programName": "청년 식비 지원 바우처",
+          "category": "일반 음식점",
+          "expiryDate": "2026-12-31T23:59",
+          "isValid": true
+          }</div>
+        <p>식별·메타 정보 9개 노출. 결제에 직접 사용되는 <span class="em">비밀 정보는 포함되지 않는다</span>.</p>
+      </div>
+      <div class="qa-card highlight">
+        <div class="qa-label accent">4중 결제 방어</div>
+        <div class="qa-title">서명 없이는 결제 불가</div>
+        <ol class="qa-list">
+          <li><span class="em">가맹점 화이트리스트</span> — msg.sender가 승인 가맹점인지</li>
+          <li><span class="em">EIP-712 사용자 서명</span> — 바우처 owner 서명이 있어야 함</li>
+          <li><span class="em">nonce</span> — 동일 서명 재사용 시 즉시 거부</li>
+          <li><span class="em">deadline</span> — 서명 만료 시 무효</li>
+        </ol>
+        <div class="qa-meta">→ QR은 "보여주기용 명함" 수준. 도용해도 트랜잭션 발생 불가.</div>
+      </div>
+    </div>
+
+    <span class="brand-mark">Appendix · Q3</span>
+    <span class="page-num">A3 / A3</span>
+  </section>
+
+</body>
+
+</html>
