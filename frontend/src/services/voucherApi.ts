@@ -163,11 +163,6 @@ export interface CreateVoucherProgramRequest {
   refundPolicy?: string;
 }
 
-export interface CreateVoucherRequestDto {
-  voucherProgramId: number;
-  walletAddress: string;
-}
-
 export interface UseVoucherPrepareRequestDto {
   merchantWallet: string;
   amount: number;
@@ -241,18 +236,6 @@ export async function getMember(walletAddress: string): Promise<MemberResponse> 
   return res.data.data;
 }
 
-export async function approveMerchantOnChain(
-  walletAddress: string,
-  approved: boolean
-): Promise<MemberResponse> {
-  const res = await axiosApi.post<ApiResponse<MemberResponse>>(
-    `/api/members/merchant/${walletAddress}/approve`,
-    null,
-    { params: { approved } }
-  );
-  return res.data.data;
-}
-
 // =============================================================================
 // Voucher Programs
 // =============================================================================
@@ -286,16 +269,6 @@ export async function getVoucherProgram(
 // =============================================================================
 // Vouchers
 // =============================================================================
-
-export async function issueVoucher(
-  req: CreateVoucherRequestDto
-): Promise<VoucherResponse> {
-  const res = await axiosApi.post<ApiResponse<VoucherResponse>>(
-    `/api/vouchers`,
-    req
-  );
-  return res.data.data;
-}
 
 // 신규 시그니처: 백엔드 ApiResponse를 풀어서 VoucherResponse[] 그대로 반환.
 // 기존 hooks/useVoucherList.ts 가 res.data.body 형태로 접근하는 레거시 시그니처는
@@ -387,6 +360,47 @@ export async function getMerchantHistoryStatus(historyId: number): Promise<UseSt
     `/api/merchant/history/${historyId}/status`
   );
   return res.data.data.status;
+}
+
+// =============================================================================
+// Admin — 토큰 무결성 검증 (온체인 vs DB 일치 여부 확인)
+// =============================================================================
+//
+// 백엔드가 같은 tokenId 의 NFT 상태를 (1) 스마트 컨트랙트 (2) MySQL 두 곳에서
+// 동시에 조회한 뒤 잔액/해시/nonce 3가지 축으로 비교 결과를 돌려준다.
+// status:
+//   - VERIFIED         : 양쪽 모두 존재 + 3축 모두 일치
+//   - MISMATCH         : 양쪽 모두 존재하나 하나 이상 불일치
+//   - MISSING_DB       : 온체인엔 있는데 DB 누락
+//   - MISSING_ONCHAIN  : DB엔 있는데 온체인 누락
+
+export interface VerificationResponse {
+  tokenId: number;
+  status: "VERIFIED" | "MISMATCH" | "MISSING_DB" | "MISSING_ONCHAIN";
+
+  dbValue: number | null;
+  onChainValue: number | null;
+  valueMatch: boolean;
+
+  dbHashes: string[] | null;
+  onChainHashes: string[] | null;
+  hashMatch: boolean;
+
+  dbNonce: number | null;
+  onChainNonce: number | null;
+  nonceMatch: boolean;
+
+  ownerWallet: string | null;
+  programName: string | null;
+  checkedAt: string;
+  message: string;
+}
+
+export async function verifyToken(tokenId: number): Promise<VerificationResponse> {
+  const res = await axiosApi.get<ApiResponse<VerificationResponse>>(
+    `/api/verify/${tokenId}`
+  );
+  return res.data.data;
 }
 
 // =============================================================================

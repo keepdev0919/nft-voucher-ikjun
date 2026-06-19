@@ -1,48 +1,27 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { getProgramList } from "../../services/voucherApi";
+import { getActivePrograms, VoucherProgramResponse } from "../../services/voucherApi";
 import { useWallet } from "../../context/WalletContext";
 import Toast from "../../components/Toast";
 
-interface Program {
-  programId: number;
-  name: string;
-  amount: number;
-  totalSupply: number;
-  category: string;
-  expiryDate: string;
-}
-
-function formatDate(val: string | number): string {
+function formatDate(val: string | null | undefined): string {
   if (!val) return "-";
-  if (typeof val === "number" || /^\d{10,}/.test(String(val))) {
-    const d = new Date(Number(val) * 1000);
-    return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}`;
-  }
-  return String(val);
+  const d = new Date(val);
+  if (isNaN(d.getTime())) return String(val);
+  return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}`;
 }
 
 export default function AdminHome() {
   const navigate = useNavigate();
   const { nickname } = useWallet();
-  const [programs, setPrograms] = useState<Program[]>([]);
+  const [programs, setPrograms] = useState<VoucherProgramResponse[]>([]);
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
     setLoading(true);
-    getProgramList()
-      .then((res) => {
-        const data = (res.data?.body ?? []).map((item: any) => ({
-          programId: Number(item.programId ?? item.id ?? 0),
-          name: item.name ?? "프로그램",
-          amount: Number(item.amount ?? 0),
-          totalSupply: Number(item.totalSupply ?? 0),
-          category: item.category ?? "",
-          expiryDate: formatDate(item.expiryDate ?? item.expiresAt ?? ""),
-        }));
-        setPrograms(data);
-      })
+    getActivePrograms()
+      .then((data) => setPrograms(data ?? []))
       .catch((err) => {
         setToast(err?.response?.data?.message ?? "프로그램 목록을 불러오지 못했습니다.");
       })
@@ -72,24 +51,12 @@ export default function AdminHome() {
       </div>
 
       {/* 빠른 액세스 */}
-      <div className="px-6 mt-3 grid grid-cols-3 gap-2">
+      <div className="px-6 mt-3">
         <button
           onClick={() => navigate("/admin/create")}
-          className="py-3.5 rounded-v-md bg-v-accentLight text-v-accent text-[13px] font-semibold active:bg-v-accent/20 transition-colors"
+          className="w-full py-3.5 rounded-v-md bg-v-accentLight text-v-accent text-[13px] font-semibold active:bg-v-accent/20 transition-colors"
         >
-          프로그램 생성
-        </button>
-        <button
-          onClick={() => navigate("/admin/issue")}
-          className="py-3.5 rounded-v-md bg-v-accentLight text-v-accent text-[13px] font-semibold active:bg-v-accent/20 transition-colors"
-        >
-          바우처 발급
-        </button>
-        <button
-          onClick={() => navigate("/admin/merchant-approve")}
-          className="py-3.5 rounded-v-md bg-v-accentLight text-v-accent text-[13px] font-semibold active:bg-v-accent/20 transition-colors"
-        >
-          가맹점 승인
+          + 새 프로그램 생성
         </button>
       </div>
 
@@ -114,16 +81,16 @@ export default function AdminHome() {
         ) : (
           <div className="space-y-2">
             {programs.map((prog) => (
-              <div key={prog.programId} className="bg-v-surface rounded-v-lg px-4 py-3.5 shadow-v-sm">
+              <div key={prog.id} className="bg-v-surface rounded-v-lg px-4 py-3.5 shadow-v-sm">
                 <div className="flex items-start justify-between">
                   <div>
                     <p className="text-sm font-semibold text-v-text">{prog.name}</p>
                     <p className="text-xs text-v-textMuted mt-0.5">{prog.category} · {prog.totalSupply}개 발행</p>
-                    <p className="text-xs text-v-textMuted mt-0.5">유효기간: {prog.expiryDate}</p>
+                    <p className="text-xs text-v-textMuted mt-0.5">유효기간: {formatDate(prog.validUntil)}</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm font-bold text-v-accent">{prog.amount.toLocaleString("ko-KR")}원</p>
-                    <p className="text-[10px] text-v-textMuted mt-0.5">#{prog.programId}</p>
+                    <p className="text-sm font-bold text-v-accent">{Number(prog.maxValue).toLocaleString("ko-KR")}원</p>
+                    <p className="text-[10px] text-v-textMuted mt-0.5">#{prog.id}</p>
                   </div>
                 </div>
               </div>

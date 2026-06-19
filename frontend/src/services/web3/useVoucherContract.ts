@@ -119,28 +119,6 @@ export function useVoucherContract() {
   };
 
   /**
-   * 가맹점 승인/해제 — onlyOwner.
-   * 반환: txHash
-   */
-  const approveMerchant = async (
-    merchant: string,
-    approved: boolean
-  ): Promise<string> => {
-    const web3 = getWeb3();
-    const contract = getContract(web3);
-    const from = await getFromAddress();
-
-    try {
-      const receipt = await contract.methods
-        .approveMerchant(merchant, approved)
-        .send({ from });
-      return receipt.transactionHash as string;
-    } catch (err: any) {
-      return rethrow(err, "가맹점 승인 처리 중 오류가 발생했습니다.");
-    }
-  };
-
-  /**
    * 바우처 사용 (Option A) — 바우처 소유자가 직접 호출.
    * recordCommitmentHash: 0x 프리픽스 66자 hex (bytes32)
    * 반환: txHash
@@ -266,7 +244,6 @@ export function useVoucherContract() {
   return {
     createVoucherProgram,
     mintVoucher,
-    approveMerchant,
     useVoucher,
     useVoucherByMerchant,
     isValidVoucher,
